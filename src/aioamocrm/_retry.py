@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import random
 from dataclasses import dataclass, field
 
@@ -56,5 +57,11 @@ class RetryPolicy:
 
     def backoff(self, attempt: int, rng: random.Random) -> float:
         """Return the delay after failed attempt number ``attempt`` (1-based)."""
-        ceiling = min(self.backoff_max, self.backoff_base * 2 ** max(0, attempt - 1))
+        # backoff_base * 2 ** n overflows a float for large n (OverflowError); past that point
+        # the delay is backoff_max anyway.
+        try:
+            doubled = math.ldexp(self.backoff_base, max(0, attempt - 1))
+        except OverflowError:
+            doubled = math.inf
+        ceiling = min(self.backoff_max, doubled)
         return rng.uniform(ceiling / 2, ceiling)

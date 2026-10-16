@@ -29,6 +29,13 @@ def test_backoff_doubles_with_jitter_and_is_capped() -> None:
     assert lows == [0.25, 0.5, 1.0, 1.5, 1.5, 1.5]
 
 
+def test_backoff_stays_capped_for_any_attempt_number() -> None:
+    # 0.5 * 2 ** 1100 does not fit in a float: a long-running retry loop must not crash on it.
+    policy = RetryPolicy(max_attempts=5_000, backoff_base=0.5, backoff_max=30.0)
+    for attempt in (64, 1_025, 1_100, 4_999):
+        assert policy.backoff(attempt, Bounds(upper=True)) == 30.0
+
+
 def test_backoff_jitter_stays_within_the_band() -> None:
     policy = RetryPolicy(backoff_base=1.0, backoff_max=60.0)
     rng = random.Random(42)
