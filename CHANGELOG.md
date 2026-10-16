@@ -46,5 +46,13 @@ All notable changes to this project are documented here. The format follows
   `contacts[update][0][custom_fields][0][values][0][value]`, `account[subdomain]`...) into
   `WebhookEvent`s with `entity`, `action` and `payload`, framework-agnostic.
 - Examples: `oauth_flow.py`, `sync_leads.py`, `webhook_fastapi.py`.
+- Documentation: `README.md` in English and `README.ru.md` in Russian, with the same sections
+  and samples: quick start with a long-lived token, OAuth2 and token storage (an SQLite
+  storage for many accounts), pagination and filters, leads with contacts and companies,
+  custom fields, notes and tasks, webhooks with FastAPI, rate limiting and retries, errors,
+  what was checked against the documentation only, limits and roadmap, testing with respx,
+  and the release process. Every Python sample in both files runs in `tests/test_readme.py`
+  against respx mocks (`pycon` samples as doctests), so a sample that stops working fails the
+  build. The sdist includes `README.ru.md`.
 
 [0.1.0]: https://github.com/sinnercode228/aioamocrm/releases/tag/v0.1.0
