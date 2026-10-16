@@ -22,6 +22,10 @@ documentation and have not been checked against a live account yet:
 - the shape of error answers (`title`, `detail`, `validation-errors` with `request_id`,
   `code`, `path`, `detail`) and HTTP 402 for an unpaid account;
 - `Retry-After`: the documentation does not promise it; it is honoured when present;
+- whether a write answered with 429 was applied: the documentation does not say, so `POST` and
+  `PATCH` are not sent again after a 429 (or a 5xx, or a timeout) unless the call passes
+  `retry=True`;
+- `request_id` coming back unchanged in write answers (a number sent comes back as a number);
 - the webhook body format, including notes under `leads[note][0][note][...]`, and the absence
   of any signature on account webhooks;
 - `"result": []` on tasks without a result.
