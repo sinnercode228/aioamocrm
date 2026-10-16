@@ -114,7 +114,11 @@ class OAuth2:
     after a 401. A lock makes concurrent requests share one refresh, and the rotated refresh
     token is saved to ``storage`` as part of every refresh. Before refreshing, the storage is
     read again, so that tokens renewed meanwhile by another process sharing it are adopted
-    instead of spending a refresh token that is no longer valid.
+    instead of spending a refresh token that is no longer valid. When two processes refresh at
+    the same moment, amoCRM accepts the refresh token once; the process that was refused reads
+    the storage again and takes the winner's tokens if they are saved by then. To rule out
+    that race entirely, give the processes a storage whose ``load`` and ``save`` run under a
+    lock they share (a database row lock, for instance) or refresh from one process only.
 
     One instance belongs to one amoCRM account: give each account its own instance and
     storage.
@@ -250,12 +254,37 @@ class OAuth2:
             if base is None:
                 msg = "no OAuth2 tokens yet: call exchange_code() with an authorization code first"
                 raise AuthError(msg)
-            tokens = await self._request(
-                endpoint, {"grant_type": "refresh_token", "refresh_token": base.refresh_token}
-            )
+            try:
+                tokens = await self._request(
+                    endpoint, {"grant_type": "refresh_token", "refresh_token": base.refresh_token}
+                )
+            except AuthError:
+                winner = await self._renewed_elsewhere(base)
+                if winner is None:
+                    raise
+                logger.info("OAuth2 refresh refused; using the tokens another process saved")
+                self._tokens = winner
+                return winner
             await self._store(tokens)
         logger.info("OAuth2 tokens refreshed; access token valid until %.0f", tokens.expires_at)
         return tokens
+
+    async def _renewed_elsewhere(self, spent: TokenSet) -> TokenSet | None:
+        """After a refused refresh, return a newer set another process saved, if there is one.
+
+        Two processes sharing the storage can read the same refresh token and refresh at the
+        same moment. amoCRM accepts it once, so the other refresh is refused; by then the
+        winner has usually saved its new set.
+        """
+        latest = await self.storage.load()
+        if (
+            latest is not None
+            and latest.refresh_token != spent.refresh_token
+            and latest.expires_at > spent.expires_at
+            and not latest.expires_within(self.refresh_margin, now=self._clock())
+        ):
+            return latest
+        return None
 
     async def _store(self, tokens: TokenSet) -> None:
         # Kept in memory first: the old refresh token is already dead, so even if the storage

@@ -16,7 +16,8 @@ All notable changes to this project are documented here. The format follows
   expiry (`refresh_margin`, 60 s by default) and once after a 401, one shared refresh for
   concurrent requests, the rotated refresh token saved through a `TokenStorage`
   (`MemoryTokenStorage`, `JsonFileTokenStorage` with atomic writes and mode 0600), and
-  adoption of tokens renewed by another process sharing the storage.
+  adoption of tokens renewed by another process sharing the storage, also when that process
+  spent the refresh token first and this refresh was refused.
 - `RateLimiter`: requests spaced at 7 per second by default, configurable or shared between
   clients.
 - `RetryPolicy`: exponential backoff with jitter and `Retry-After`, a bounded number of

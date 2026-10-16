@@ -211,6 +211,43 @@ async def test_tokens_renewed_by_another_process_are_adopted(
     assert not route.called
 
 
+REVOKED = {
+    "hint": "Token has been revoked",
+    "title": "Invalid request",
+    "type": "https://developers.amocrm.ru/v3/errors/OAuthProblemJson",
+    "status": 400,
+    "detail": "The refresh token is invalid.",
+}
+
+
+async def test_two_workers_refreshing_at_once_end_up_with_the_winners_tokens(
+    endpoint: TokenEndpoint, mock: respx.MockRouter
+) -> None:
+    # Both workers read refresh-1 from the shared storage before either saved a new set.
+    # amoCRM accepts refresh-1 once; the loser's refusal arrives after the winner saved.
+    spent: set[str] = set()
+
+    async def single_use_refresh_tokens(request: httpx.Request) -> httpx.Response:
+        refresh_token = json.loads(request.content)["refresh_token"]
+        if refresh_token in spent:
+            await asyncio.sleep(0.05)
+            return httpx.Response(400, json=REVOKED)
+        spent.add(refresh_token)
+        await asyncio.sleep(0.01)
+        return token_answer(2)
+
+    route = mock.post(TOKEN_URL).mock(side_effect=single_use_refresh_tokens)
+    storage = MemoryTokenStorage(valid_tokens(1, expires_at=NOW))
+    winner, loser = oauth(storage), oauth(storage)
+
+    tokens = await asyncio.gather(winner.get_token(endpoint), loser.get_token(endpoint))
+
+    assert list(tokens) == ["access-2", "access-2"]
+    assert route.call_count == 2
+    assert await loser.get_token(endpoint) == "access-2"
+    assert route.call_count == 2
+
+
 async def test_a_failed_refresh_raises_auth_error_and_keeps_the_old_tokens(
     endpoint: TokenEndpoint, mock: respx.MockRouter
 ) -> None:
