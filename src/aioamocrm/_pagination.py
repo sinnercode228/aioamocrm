@@ -127,10 +127,16 @@ async def iterate_pages(
             return
         number += 1
         if client.owns_url(page.next_url) and page.next_url != url:
-            # Follow the link, adding back any parameter it left out (such as with=).
+            # Follow the link, adding back any parameter it left out (such as with=). That
+            # includes limit: without it the server would use its default page size, the page
+            # would look short next to ours and the walk would end early.
             present = {name for name, _ in httpx.URL(page.next_url).params.multi_items()}
             url = page.next_url
-            params = [(name, value) for name, value in query if name not in present]
+            params = [
+                (name, value)
+                for name, value in [("limit", str(limit)), *query]
+                if name not in present
+            ]
         else:
             url = path
             params = [("page", str(number)), ("limit", str(limit)), *query]

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import httpx
 import pytest
 import respx
@@ -7,6 +9,7 @@ import respx
 from aioamocrm import AmoCRMClient, Lead, Page
 
 from . import payloads
+from .conftest import API
 
 
 def leads_page(ids: list[int], number: int, *, limit: int, has_next: bool) -> httpx.Response:
@@ -173,3 +176,34 @@ async def test_parameters_missing_from_the_next_link_are_kept(
     assert second["with"] == "contacts"
     assert second["filter[updated_at][from]"] == "1700000000"
     assert len(second.multi_items()) == 4
+
+
+def numbered_leads(total: int, next_href: Callable[[int], str]) -> Callable[..., httpx.Response]:
+    """A list endpoint over leads 1..total that honours page and limit like amoCRM."""
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        params = request.url.params
+        # Without limit the server uses its own default, smaller than what the walk asked for.
+        number, limit = int(params["page"]), int(params.get("limit", "2"))
+        ids = list(range((number - 1) * limit + 1, min(number * limit, total) + 1))
+        if not ids:
+            return httpx.Response(204)
+        body = payloads.page("leads", [payloads.lead(i) for i in ids], number=number, limit=limit)
+        body["_links"]["next"] = {"href": next_href(number)}
+        return httpx.Response(200, json=body)
+
+    return answer
+
+
+async def test_a_next_link_without_limit_keeps_the_page_size(
+    amo: AmoCRMClient, mock: respx.MockRouter
+) -> None:
+    route = mock.get("/api/v4/leads").mock(
+        side_effect=numbered_leads(7, lambda number: f"{API}/leads?page={number + 1}")
+    )
+
+    ids = [lead.id async for lead in amo.leads.iterate(limit=3)]
+
+    assert ids == [1, 2, 3, 4, 5, 6, 7]
+    assert [call.request.url.params["page"] for call in route.calls] == ["1", "2", "3"]
+    assert [call.request.url.params["limit"] for call in route.calls] == ["3", "3", "3"]
