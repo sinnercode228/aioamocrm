@@ -42,11 +42,12 @@ async def test_iterate_walks_three_pages_by_following_next(
     assert first["page"] == "1"
     assert first["limit"] == "2"
     assert first["filter[id][0]"] == "1"
-    # Later pages are the hrefs amoCRM gave in _links.next.
-    assert [str(call.request.url) for call in route.calls[1:]] == [
-        "https://example.amocrm.ru/api/v4/leads?page=2&limit=2",
-        "https://example.amocrm.ru/api/v4/leads?page=3&limit=2",
-    ]
+    # Later pages are the hrefs amoCRM gave in _links.next, plus the filter they left out.
+    for call, number in zip(route.calls[1:], ("2", "3"), strict=True):
+        params = call.request.url.params
+        assert params["page"] == number
+        assert params["limit"] == "2"
+        assert params.get_list("filter[id][4]") == ["5"]
 
 
 async def test_a_short_page_ends_the_walk_even_with_a_next_link(
@@ -146,3 +147,29 @@ async def test_a_page_without_embedded_items_is_empty(
 ) -> None:
     mock.get("/api/v4/leads").mock(return_value=httpx.Response(200, json={"_page": 1}))
     assert [lead async for lead in amo.leads.iterate()] == []
+
+
+async def test_parameters_missing_from_the_next_link_are_kept(
+    amo: AmoCRMClient, mock: respx.MockRouter
+) -> None:
+    body = payloads.page("leads", [payloads.lead(1), payloads.lead(2)], limit=2)
+    # A next link that carries only page and limit must not drop with= or filter[...].
+    body["_links"]["next"] = {"href": "https://example.amocrm.ru/api/v4/leads?page=2&limit=2"}
+    route = mock.get("/api/v4/leads").mock(
+        side_effect=[httpx.Response(200, json=body), leads_page([3], 2, limit=2, has_next=False)]
+    )
+
+    ids = [
+        lead.id
+        async for lead in amo.leads.iterate(
+            limit=2, with_=["contacts"], filter={"updated_at": {"from": 1700000000}}
+        )
+    ]
+
+    assert ids == [1, 2, 3]
+    second = route.calls[1].request.url.params
+    assert second["page"] == "2"
+    assert second["limit"] == "2"
+    assert second["with"] == "contacts"
+    assert second["filter[updated_at][from]"] == "1700000000"
+    assert len(second.multi_items()) == 4

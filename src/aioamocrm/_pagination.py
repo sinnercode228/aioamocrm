@@ -11,6 +11,8 @@ from collections.abc import AsyncIterator, Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
+import httpx
+
 from ._models import AmoModel
 
 if TYPE_CHECKING:
@@ -125,7 +127,10 @@ async def iterate_pages(
             return
         number += 1
         if client.owns_url(page.next_url) and page.next_url != url:
-            url, params = page.next_url, None
+            # Follow the link, adding back any parameter it left out (such as with=).
+            present = {name for name, _ in httpx.URL(page.next_url).params.multi_items()}
+            url = page.next_url
+            params = [(name, value) for name, value in query if name not in present]
         else:
             url = path
             params = [("page", str(number)), ("limit", str(limit)), *query]

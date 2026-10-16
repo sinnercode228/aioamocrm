@@ -258,12 +258,13 @@ class AmoCRMClient:
     ) -> httpx.Response:
         policy = self.retry
         unsafe_ok = retry if retry is not None else method in policy.idempotent_methods
-        query: httpx.QueryParams | None = None
+        target = httpx.URL(url)
+        # Merged here: httpx would replace a query already in the URL (a _links href) instead.
         if isinstance(params, Mapping):
-            query = httpx.QueryParams(tuple(encode_mapping(params)))
+            target = target.copy_merge_params(httpx.QueryParams(tuple(encode_mapping(params))))
         elif params is not None:
-            query = httpx.QueryParams(tuple(params))
-        path = httpx.URL(url).path  # logged instead of the URL: the query may hold search terms
+            target = target.copy_merge_params(httpx.QueryParams(tuple(params)))
+        path = target.path  # logged instead of the URL: the query may hold search terms
         attempt = 1
         reauthorized = False
         while True:
@@ -272,7 +273,7 @@ class AmoCRMClient:
             token = await self.auth.get_token(self._endpoint)
             try:
                 response = await self.http.request(
-                    method, url, params=query, json=json, headers=self._headers(token)
+                    method, target, json=json, headers=self._headers(token)
                 )
             except httpx.RequestError as exc:
                 retryable = isinstance(exc, httpx.TransportError) and (
@@ -293,7 +294,8 @@ class AmoCRMClient:
                     attempt += 1
                     continue
                 msg = f"{method} {path} failed: {type(exc).__name__}: {exc}"
-                raise NetworkError(msg, method=method, url=url.split("?", 1)[0]) from exc
+                where = str(target.copy_with(query=None))
+                raise NetworkError(msg, method=method, url=where) from exc
 
             status = response.status_code
             logger.debug("%s %s -> %d", method, path, status)

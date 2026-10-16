@@ -174,3 +174,15 @@ async def test_tokens_never_reach_the_logs(
         text = record.getMessage()
         assert TOKEN not in text
         assert "secret-search" not in text
+
+
+async def test_params_are_merged_into_a_url_that_has_a_query(
+    amo: AmoCRMClient, mock: respx.MockRouter
+) -> None:
+    route = mock.get("/api/v4/leads").mock(return_value=httpx.Response(204))
+    await amo.request("GET", f"{API}/leads?page=2&limit=50", params={"with": "contacts"})
+    assert route.calls.last.request.url.params.multi_items() == [
+        ("page", "2"),
+        ("limit", "50"),
+        ("with", "contacts"),
+    ]
