@@ -8,7 +8,12 @@ register ``https://your-host/webhooks/amocrm/<secret>`` in the amoCRM webhook se
 
 The endpoint checks the secret in constant time, parses the form body and answers right away;
 the events are handled in a background task, because amoCRM resends webhooks that are not
-answered quickly and switches off endpoints that keep failing.
+answered quickly and switches off endpoints that keep failing. Background tasks die with the
+process: when losing an event matters, put the parsed events in a queue or a table instead.
+
+Since anyone who learns the URL can post to it, treat an event as a notification: before
+acting on anything that matters, fetch the entity by ``event.id`` through the API. The README
+section "Webhooks" has the details.
 """
 
 from __future__ import annotations
@@ -46,13 +51,13 @@ def handle(webhook: Webhook) -> None:
 
 def create_app(secret: str, handler: Callable[[Webhook], None] = handle) -> FastAPI:
     app = FastAPI(title="amoCRM webhooks")
-    expected = secret.encode()
+    expected = secret.encode()  # an empty secret accepts nothing
 
-    @app.post("/webhooks/amocrm/{token}")
+    @app.post("/webhooks/amocrm/{secret}")
     async def amocrm_webhook(
-        token: str, request: Request, background: BackgroundTasks
+        secret: str, request: Request, background: BackgroundTasks
     ) -> dict[str, int]:
-        if not expected or not hmac.compare_digest(token.encode(), expected):
+        if not expected or not hmac.compare_digest(secret.encode(), expected):
             raise HTTPException(status_code=404)
         try:
             webhook = parse_webhook(await request.body())
