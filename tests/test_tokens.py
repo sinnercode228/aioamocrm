@@ -52,6 +52,30 @@ def test_incomplete_token_answers_are_rejected(answer: dict[str, object]) -> Non
         TokenSet.from_response(answer, now=0.0)
 
 
+@pytest.mark.parametrize("expires_in", ["NaN", "Infinity", "-Infinity", "-5"])
+def test_an_expiry_that_is_not_a_finite_duration_is_rejected(expires_in: str) -> None:
+    # json.loads (and so httpx) accepts NaN and Infinity. With expires_at = NaN or inf the
+    # token would never count as expiring and would only be renewed after a 401.
+    answer = json.loads(
+        f'{{"access_token": "a", "refresh_token": "r", "expires_in": {expires_in}}}'
+    )
+    with pytest.raises(AuthError, match="expires_in"):
+        TokenSet.from_response(answer, now=0.0)
+
+
+@pytest.mark.parametrize("expires_at", ["NaN", "Infinity"])
+async def test_a_stored_expiry_that_is_not_finite_is_rejected(
+    tmp_path: Path, expires_at: str
+) -> None:
+    path = tmp_path / "tokens.json"
+    path.write_text(
+        f'{{"access_token": "a", "refresh_token": "r", "expires_at": {expires_at}}}',
+        encoding="utf-8",
+    )
+    with pytest.raises(AuthError, match="expires_at"):
+        await JsonFileTokenStorage(path).load()
+
+
 def test_token_set_never_shows_its_secrets() -> None:
     tokens = token("very-secret-access", "very-secret-refresh")
     for text in (repr(tokens), str(tokens)):

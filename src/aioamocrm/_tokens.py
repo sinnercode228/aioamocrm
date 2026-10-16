@@ -12,6 +12,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import math
 import os
 import tempfile
 from collections.abc import Mapping
@@ -66,8 +67,15 @@ class TokenSet:
         if not isinstance(access, str) or not access or not isinstance(refresh, str) or not refresh:
             msg = "the token endpoint answer has no access_token or refresh_token"
             raise AuthError(msg)
-        if isinstance(expires_in, bool) or not isinstance(expires_in, (int, float)):
-            msg = "the token endpoint answer has no numeric expires_in"
+        if (
+            isinstance(expires_in, bool)
+            or not isinstance(expires_in, (int, float))
+            or not math.isfinite(expires_in)
+            or expires_in < 0
+        ):
+            # NaN or infinity (json.loads accepts both) would make the token never expire
+            # in our eyes, so it would only be renewed after a 401.
+            msg = "the token endpoint answer has no usable expires_in (seconds, finite, >= 0)"
             raise AuthError(msg)
         token_type = data.get("token_type")
         return cls(
@@ -100,8 +108,12 @@ class TokenSet:
         if not isinstance(access, str) or not isinstance(refresh, str):
             msg = "access_token and refresh_token must be strings"
             raise ValueError(msg)
-        if isinstance(expires_at, bool) or not isinstance(expires_at, (int, float)):
-            msg = "expires_at must be a number"
+        if (
+            isinstance(expires_at, bool)
+            or not isinstance(expires_at, (int, float))
+            or not math.isfinite(expires_at)
+        ):
+            msg = "expires_at must be a finite number"
             raise ValueError(msg)
         if not isinstance(token_type, str):
             msg = "token_type must be a string"
