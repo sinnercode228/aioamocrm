@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 
 import httpx
 import pytest
@@ -69,7 +69,7 @@ async def endpoint() -> AsyncIterator[TokenEndpoint]:
 
 
 @pytest.fixture
-def mock() -> respx.MockRouter:
+def mock() -> Iterator[respx.MockRouter]:
     with respx.mock(assert_all_called=False) as router:
         yield router
 

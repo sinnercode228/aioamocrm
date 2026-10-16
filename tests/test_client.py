@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 
 import httpx
@@ -81,7 +82,8 @@ async def test_paths_and_nested_params(amo: AmoCRMClient, mock: respx.MockRouter
 async def test_json_body_is_sent(amo: AmoCRMClient, mock: respx.MockRouter) -> None:
     route = mock.post("/api/v4/leads").mock(return_value=httpx.Response(200, json={}))
     await amo.request("POST", "leads", json=[{"name": "Deal"}])
-    assert route.calls.last.request.content == b'[{"name":"Deal"}]'
+    assert json.loads(route.calls.last.request.content) == [{"name": "Deal"}]
+    assert route.calls.last.request.headers["Content-Type"] == "application/json"
 
 
 async def test_invalid_json_is_an_error(amo: AmoCRMClient, mock: respx.MockRouter) -> None:
