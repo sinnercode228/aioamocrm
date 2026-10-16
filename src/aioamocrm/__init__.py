@@ -1,6 +1,7 @@
 """Async client for the amoCRM / Kommo API v4."""
 
 from ._auth import Auth, LongLivedToken, OAuth2, TokenEndpoint
+from ._client import DOMAINS, AmoCRMClient
 from ._errors import (
     AmoCRMError,
     AuthError,
@@ -16,10 +17,11 @@ from ._errors import (
 from ._ratelimit import RateLimiter
 from ._retry import RetryPolicy
 from ._tokens import JsonFileTokenStorage, MemoryTokenStorage, TokenSet, TokenStorage
-
-__version__ = "0.1.0"
+from ._version import __version__
 
 __all__ = [
+    "DOMAINS",
+    "AmoCRMClient",
     "AmoCRMError",
     "Auth",
     "AuthError",
