@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import math
 import time
+import weakref
 from collections.abc import Awaitable, Callable
 
 __all__ = ["RateLimiter"]
@@ -19,12 +20,14 @@ __all__ = ["RateLimiter"]
 class RateLimiter:
     """Spaces calls at least ``1 / rate`` seconds apart.
 
-    Each caller reserves the next free slot and sleeps until it, so concurrent callers are
-    served in arrival order and no more than ``rate`` calls start in any one-second window.
-    Idle time does not build up credit for a later burst. A cancelled caller leaves its slot
-    unused, which only ever makes the spacing more conservative.
+    Callers queue up in arrival order. Each one waits until ``1 / rate`` seconds have passed
+    since the previous caller was actually let through, so the spacing holds even when the
+    event loop was blocked and every waiter wakes up late: a stall delays the queue, it never
+    releases a burst. Idle time does not build up credit for a later burst either, and a
+    cancelled caller leaves the queue without using a slot.
 
-    One limiter can be shared by several clients that must share one budget.
+    One limiter can be shared by several clients that must share one budget, within one event
+    loop.
 
     Args:
         rate: Calls per second.
@@ -46,7 +49,9 @@ class RateLimiter:
         self._interval = 1.0 / self._rate
         self._clock = clock
         self._sleep = sleep
-        self._next_slot = -math.inf
+        self._last = -math.inf
+        self._queue: asyncio.Lock | None = None
+        self._queue_loop: weakref.ref[asyncio.AbstractEventLoop] | None = None
 
     @property
     def rate(self) -> float:
@@ -58,11 +63,19 @@ class RateLimiter:
 
     async def acquire(self) -> None:
         """Wait for the next free slot."""
-        # No await between reading and moving the next slot: the reservation is atomic
-        # within the event loop, so no lock is needed.
-        now = self._clock()
-        slot = max(now, self._next_slot)
-        self._next_slot = slot + self._interval
-        delay = slot - now
-        if delay > 0:
-            await self._sleep(delay)
+        # The lock is a fair FIFO queue. Slots are not booked in advance: each caller measures
+        # from the moment the previous one really went, after any late wake-up.
+        async with self._queue_of_running_loop():
+            delay = self._last + self._interval - self._clock()
+            if delay > 0:
+                await self._sleep(delay)
+            self._last = self._clock()
+
+    def _queue_of_running_loop(self) -> asyncio.Lock:
+        # An asyncio.Lock belongs to the loop it first waited in; a limiter that outlives its
+        # loop (one client, several asyncio.run() calls) gets a fresh queue in the next one.
+        loop = asyncio.get_running_loop()
+        if self._queue is None or self._queue_loop is None or self._queue_loop() is not loop:
+            self._queue = asyncio.Lock()
+            self._queue_loop = weakref.ref(loop)
+        return self._queue

@@ -18,8 +18,9 @@ All notable changes to this project are documented here. The format follows
   (`MemoryTokenStorage`, `JsonFileTokenStorage` with atomic writes and mode 0600), and
   adoption of tokens renewed by another process sharing the storage, also when that process
   spent the refresh token first and this refresh was refused.
-- `RateLimiter`: requests spaced at 7 per second by default, configurable or shared between
-  clients.
+- `RateLimiter`: requests spaced at 7 per second by default, in arrival order, each measured
+  from the moment the previous one went, so a stalled event loop never releases a burst;
+  configurable or shared between clients.
 - `RetryPolicy`: exponential backoff with jitter and `Retry-After`, a bounded number of
   attempts; failures to connect are retried for every method, 429, 5xx and timeouts only for
   idempotent methods unless the call passes `retry=True`, so a write is never sent twice
