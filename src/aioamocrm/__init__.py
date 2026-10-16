@@ -1,5 +1,6 @@
 """Async client for the amoCRM / Kommo API v4."""
 
+from ._auth import Auth, LongLivedToken, OAuth2, TokenEndpoint
 from ._errors import (
     AmoCRMError,
     AuthError,
@@ -18,15 +19,19 @@ __version__ = "0.1.0"
 
 __all__ = [
     "AmoCRMError",
+    "Auth",
     "AuthError",
     "ForbiddenError",
     "JsonFileTokenStorage",
+    "LongLivedToken",
     "MemoryTokenStorage",
     "NetworkError",
     "NotFoundError",
+    "OAuth2",
     "PaymentRequiredError",
     "RateLimitError",
     "ServerError",
+    "TokenEndpoint",
     "TokenSet",
     "TokenStorage",
     "ValidationError",

@@ -1,0 +1,287 @@
+"""Authorization: long-lived tokens and OAuth2 with refresh-token rotation.
+
+The token endpoint, the request bodies and the answer come from the amoCRM v4 documentation
+(``POST https://{subdomain}.amocrm.ru/oauth2/access_token`` with a JSON body; the answer holds
+``token_type``, ``expires_in``, ``access_token`` and ``refresh_token``); they were not checked
+against a live account here. Token requests are never retried: an authorization code works
+once, and a refresh that reached amoCRM but whose answer was lost has already burnt the old
+refresh token, so a blind retry cannot help and may hide what happened.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import time
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
+from typing import Any, Protocol, runtime_checkable
+
+import httpx
+
+from ._errors import AuthError, NetworkError, error_from_response
+from ._tokens import MemoryTokenStorage, TokenSet, TokenStorage
+
+__all__ = ["Auth", "LongLivedToken", "OAuth2", "TokenEndpoint"]
+
+logger = logging.getLogger(__name__)
+
+_HTTP_OK = 200
+
+
+@dataclass(frozen=True)
+class TokenEndpoint:
+    """The OAuth2 token endpoint of one account and the HTTP client to reach it.
+
+    :class:`~aioamocrm.AmoCRMClient` builds one for its account and hands it to the
+    :class:`Auth` it was given.
+
+    Attributes:
+        http: Client used for token requests.
+        url: Full URL of ``/oauth2/access_token`` on the account's domain.
+    """
+
+    http: httpx.AsyncClient
+    url: str
+
+
+@runtime_checkable
+class Auth(Protocol):
+    """How the client gets the bearer token for its requests."""
+
+    async def get_token(self, endpoint: TokenEndpoint) -> str:
+        """Return the access token to send now, renewing it first if needed."""
+        ...
+
+    async def handle_unauthorized(self, endpoint: TokenEndpoint, rejected_token: str) -> bool:
+        """React to an HTTP 401 for ``rejected_token``.
+
+        Returns:
+            ``True`` when a different token is now available and the request is worth one
+            more try, ``False`` when the 401 is final.
+        """
+        ...
+
+
+class LongLivedToken:
+    """A long-lived token created in the amoCRM integration settings.
+
+    It is sent as ``Authorization: Bearer <token>`` and never refreshed: a 401 means the
+    token was revoked or expired, and is raised as :class:`~aioamocrm.AuthError`.
+
+    Args:
+        token: The token text.
+    """
+
+    def __init__(self, token: str) -> None:
+        if not token.strip():
+            msg = "token must not be blank"
+            raise ValueError(msg)
+        self._token = token.strip()
+
+    def __repr__(self) -> str:
+        return "LongLivedToken(<hidden>)"
+
+    async def get_token(self, endpoint: TokenEndpoint) -> str:
+        """Return the token."""
+        return self._token
+
+    async def handle_unauthorized(
+        self,
+        endpoint: TokenEndpoint,
+        rejected_token: str,
+    ) -> bool:
+        """A long-lived token cannot be renewed: the 401 is final."""
+        return False
+
+
+class OAuth2:
+    """OAuth2 authorization code flow with automatic refresh.
+
+    The access token is refreshed ``refresh_margin`` seconds before ``expires_at`` and once
+    after a 401. A lock makes concurrent requests share one refresh, and the rotated refresh
+    token is saved to ``storage`` as part of every refresh. Before refreshing, the storage is
+    read again, so that tokens renewed meanwhile by another process sharing it are adopted
+    instead of spending a refresh token that is no longer valid.
+
+    One instance belongs to one amoCRM account: give each account its own instance and
+    storage.
+
+    Args:
+        client_id: Integration ID from the integration settings.
+        client_secret: Secret key from the integration settings.
+        redirect_uri: Redirect URI exactly as registered for the integration.
+        storage: Where the tokens are kept; defaults to an empty :class:`MemoryTokenStorage`.
+        refresh_margin: Seconds before expiry at which the access token is renewed.
+        clock: Returns the current Unix time; replaceable in tests.
+    """
+
+    def __init__(
+        self,
+        client_id: str,
+        client_secret: str,
+        redirect_uri: str,
+        storage: TokenStorage | None = None,
+        *,
+        refresh_margin: float = 60.0,
+        clock: Callable[[], float] = time.time,
+    ) -> None:
+        for name, value in (
+            ("client_id", client_id),
+            ("client_secret", client_secret),
+            ("redirect_uri", redirect_uri),
+        ):
+            if not value.strip():
+                msg = f"{name} must not be blank"
+                raise ValueError(msg)
+        if refresh_margin < 0:
+            msg = "refresh_margin must not be negative"
+            raise ValueError(msg)
+        self.client_id = client_id
+        self._client_secret = client_secret
+        self.redirect_uri = redirect_uri
+        self.storage: TokenStorage = storage if storage is not None else MemoryTokenStorage()
+        self.refresh_margin = refresh_margin
+        self._clock = clock
+        self._tokens: TokenSet | None = None
+        self._lock = asyncio.Lock()
+
+    def __repr__(self) -> str:
+        return f"OAuth2(client_id={self.client_id!r}, storage={self.storage!r})"
+
+    async def exchange_code(self, endpoint: TokenEndpoint, code: str) -> TokenSet:
+        """Trade an authorization code for the first token set and save it.
+
+        amoCRM documents the code as valid for 20 minutes and usable once.
+
+        Args:
+            endpoint: Token endpoint of the account that issued the code (the ``referer``
+                parameter of the redirect names that account's domain).
+            code: The ``code`` parameter of the redirect.
+
+        Raises:
+            AuthError: amoCRM refused the code.
+            NetworkError: The token endpoint could not be reached.
+        """
+        if not code.strip():
+            msg = "code must not be blank"
+            raise ValueError(msg)
+        async with self._lock:
+            tokens = await self._request(
+                endpoint, {"grant_type": "authorization_code", "code": code.strip()}
+            )
+            await self._store(tokens)
+        logger.info("OAuth2 code exchanged; access token valid until %.0f", tokens.expires_at)
+        return tokens
+
+    async def refresh(self, endpoint: TokenEndpoint) -> TokenSet:
+        """Refresh now, whatever the expiry of the current access token.
+
+        Raises:
+            AuthError: There are no tokens yet, or amoCRM refused the refresh token.
+            NetworkError: The token endpoint could not be reached.
+        """
+        current = await self._current()
+        return await self._renew(endpoint, current.access_token, adopt_stored=False)
+
+    async def get_token(self, endpoint: TokenEndpoint) -> str:
+        """Return a usable access token, refreshing it when it is about to expire.
+
+        Raises:
+            AuthError: There are no tokens yet, or the refresh was refused.
+            NetworkError: The token endpoint could not be reached.
+        """
+        tokens = await self._current()
+        if tokens.expires_within(self.refresh_margin, now=self._clock()):
+            tokens = await self._renew(endpoint, tokens.access_token)
+        return tokens.access_token
+
+    async def handle_unauthorized(self, endpoint: TokenEndpoint, rejected_token: str) -> bool:
+        """Renew the tokens after ``rejected_token`` got a 401, unless that already happened.
+
+        Raises:
+            AuthError: The refresh was refused.
+            NetworkError: The token endpoint could not be reached.
+        """
+        tokens = await self._renew(endpoint, rejected_token)
+        return tokens.access_token != rejected_token
+
+    async def _current(self) -> TokenSet:
+        if self._tokens is None:
+            async with self._lock:
+                if self._tokens is None:
+                    self._tokens = await self.storage.load()
+        if self._tokens is None:
+            msg = "no OAuth2 tokens yet: call exchange_code() with an authorization code first"
+            raise AuthError(msg)
+        return self._tokens
+
+    async def _renew(
+        self, endpoint: TokenEndpoint, stale_access_token: str, *, adopt_stored: bool = True
+    ) -> TokenSet:
+        async with self._lock:
+            current = self._tokens
+            if current is not None and current.access_token != stale_access_token:
+                return current  # renewed by another request while this one waited for the lock
+            stored = await self.storage.load()
+            if (
+                adopt_stored
+                and stored is not None
+                and stored.access_token != stale_access_token
+                and (current is None or stored.expires_at > current.expires_at)
+                and not stored.expires_within(self.refresh_margin, now=self._clock())
+            ):
+                logger.info("OAuth2 tokens renewed elsewhere were loaded from the storage")
+                self._tokens = stored
+                return stored
+            base = stored if stored is not None else current
+            if base is None:
+                msg = "no OAuth2 tokens yet: call exchange_code() with an authorization code first"
+                raise AuthError(msg)
+            tokens = await self._request(
+                endpoint, {"grant_type": "refresh_token", "refresh_token": base.refresh_token}
+            )
+            await self._store(tokens)
+        logger.info("OAuth2 tokens refreshed; access token valid until %.0f", tokens.expires_at)
+        return tokens
+
+    async def _store(self, tokens: TokenSet) -> None:
+        # Kept in memory first: the old refresh token is already dead, so even if the storage
+        # fails this process can go on; the storage error is still raised to the caller.
+        self._tokens = tokens
+        await self.storage.save(tokens)
+
+    async def _request(self, endpoint: TokenEndpoint, grant: Mapping[str, str]) -> TokenSet:
+        body: dict[str, Any] = {
+            "client_id": self.client_id,
+            "client_secret": self._client_secret,
+            **grant,
+            "redirect_uri": self.redirect_uri,
+        }
+        try:
+            response = await endpoint.http.post(
+                endpoint.url, json=body, headers={"Accept": "application/json"}
+            )
+        except httpx.TransportError as exc:
+            msg = f"the OAuth2 token endpoint could not be reached: {type(exc).__name__}"
+            raise NetworkError(msg, method="POST", url=endpoint.url) from exc
+        if response.status_code != _HTTP_OK:
+            error = error_from_response(response)
+            raise AuthError(
+                f"OAuth2 token request failed: {error.message}",
+                status_code=error.status_code,
+                title=error.title,
+                detail=error.detail,
+                body=error.body,
+                method=error.method,
+                url=error.url,
+            )
+        try:
+            data = response.json()
+        except ValueError:
+            msg = "the OAuth2 token endpoint answer is not JSON"
+            raise AuthError(msg, status_code=response.status_code) from None
+        if not isinstance(data, Mapping):
+            msg = "the OAuth2 token endpoint answer is not a JSON object"
+            raise AuthError(msg, status_code=response.status_code)
+        return TokenSet.from_response(data, now=self._clock())
