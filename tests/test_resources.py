@@ -9,6 +9,7 @@ import respx
 
 from aioamocrm import (
     AmoCRMClient,
+    AmoCRMError,
     Company,
     ComplexLeadResult,
     Contact,
@@ -359,6 +360,29 @@ async def test_numeric_request_ids_do_not_break_the_answer_of_a_saved_write(
 
     assert (ref.id, ref.request_id) == (10, "7")
     assert (result.id, result.contact_id, result.request_id) == (11, 12, ["7"])
+
+
+async def test_an_unreadable_answer_to_a_saved_chunk_keeps_what_amocrm_sent(
+    amo: AmoCRMClient, mock: respx.MockRouter
+) -> None:
+    odd = {"_embedded": {"leads": [{"id": "L-2", "request_id": "0"}]}}
+    mock.post("/api/v4/leads").mock(
+        side_effect=[
+            httpx.Response(200, json=payloads.created("leads", [1])),
+            httpx.Response(200, json=odd),
+        ]
+    )
+
+    with pytest.raises(AmoCRMError) as caught:
+        await amo.leads.create([Lead(name="a"), Lead(name="b")], batch_size=1)
+
+    error = caught.value
+    assert error.status_code == 200
+    assert error.body == odd  # the answer of the saved chunk, to recover its ids by hand
+    assert error.batch_offset == 1
+    assert [ref.id for ref in error.completed] == [1]
+    assert "saved" in str(error)
+    assert error.url == "https://example.amocrm.ru/api/v4/leads"
 
 
 # ---- notes ----------------------------------------------------------------------------------

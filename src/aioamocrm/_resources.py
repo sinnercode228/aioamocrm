@@ -14,6 +14,8 @@ import builtins
 from collections.abc import AsyncIterator, Callable, Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
+from pydantic import ValidationError as PydanticValidationError
+
 from ._errors import AmoCRMError, NotFoundError
 from ._models import (
     Account,
@@ -113,7 +115,21 @@ async def _write_batches(
             exc.batch_offset = offset
             exc.completed = list(results)
             raise
-        results.extend(parse(data))
+        try:
+            results.extend(parse(data))
+        except PydanticValidationError as exc:
+            # The chunk is saved: raising the bare pydantic error would lose the ids and
+            # invite a retry that creates everything again. Keep the raw answer instead.
+            msg = (
+                f"{method} /api/v4/{path}: the items were saved but the answer could not be "
+                f"read; it is kept in .body ({exc.error_count()} problems)"
+            )
+            error = AmoCRMError(
+                msg, status_code=200, body=data, method=method, url=client.api_url + path
+            )
+            error.batch_offset = offset
+            error.completed = list(results)
+            raise error from exc
     return results
 
 
