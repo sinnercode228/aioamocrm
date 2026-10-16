@@ -16,6 +16,15 @@ from ._auth import Auth, OAuth2, TokenEndpoint
 from ._errors import AmoCRMError, NetworkError, error_from_response, parse_retry_after
 from ._params import encode_mapping
 from ._ratelimit import RateLimiter
+from ._resources import (
+    AccountResource,
+    CompaniesResource,
+    ContactsResource,
+    LeadsResource,
+    PipelinesResource,
+    TasksResource,
+    UsersResource,
+)
 from ._retry import RetryPolicy
 from ._tokens import TokenSet
 from ._version import __version__
@@ -116,6 +125,21 @@ class AmoCRMClient:
         self._random = random.Random()  # noqa: S311 - jitter, not cryptography
         self._api = httpx.URL(self.api_url)
 
+        #: Leads, with their notes, custom fields and ``create_complex``.
+        self.leads = LeadsResource(self)
+        #: Contacts, with their notes and custom fields.
+        self.contacts = ContactsResource(self)
+        #: Companies, with their notes and custom fields.
+        self.companies = CompaniesResource(self)
+        #: Tasks.
+        self.tasks = TasksResource(self)
+        #: Lead pipelines and their statuses.
+        self.pipelines = PipelinesResource(self)
+        #: Users of the account.
+        self.users = UsersResource(self)
+        #: The account itself.
+        self.account = AccountResource(self)
+
     def __repr__(self) -> str:
         return f"AmoCRMClient(base_url={self.base_url!r})"
 
@@ -187,17 +211,24 @@ class AmoCRMClient:
             msg = f"{where} answered with a body that is not valid JSON"
             raise AmoCRMError(msg, status_code=response.status_code) from None
 
+    def owns_url(self, url: str) -> bool:
+        """Tell whether ``url`` is an absolute URL under this account's ``/api/v4/``."""
+        try:
+            parsed = httpx.URL(url)
+        except httpx.InvalidURL:
+            return False
+        api = self._api
+        return (
+            parsed.scheme == api.scheme
+            and parsed.host == api.host
+            and parsed.port == api.port
+            and parsed.path.startswith(api.path)
+        )
+
     def _url(self, path: str) -> str:
         if "://" not in path:
             return self.api_url + path.lstrip("/")
-        url = httpx.URL(path)
-        api = self._api
-        if (
-            url.scheme != api.scheme
-            or url.host != api.host
-            or url.port != api.port
-            or not url.path.startswith(api.path)
-        ):
+        if not self.owns_url(path):
             msg = f"refusing to send the account's token outside {self.api_url}"
             raise ValueError(msg)
         return path
