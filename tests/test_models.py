@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError as PydanticValidationError
 
 from aioamocrm import (
     Account,
@@ -78,6 +79,23 @@ def test_php_empty_arrays_in_object_fields_are_tolerated() -> None:
     link = Link.model_validate({"to_entity_id": 1, "to_entity_type": "contacts", "metadata": []})
     assert link.metadata is None
     assert EntityRef.model_validate({"id": 1, "_links": []}).links is None
+
+
+def test_numbers_in_text_fields_are_read_as_text() -> None:
+    # A lead named "2024" or a select option "5" can come out of PHP as a JSON number.
+    lead = Lead.model_validate(
+        payloads.lead(name=2024, _embedded={"tags": [{"id": 1, "name": 15, "color": None}]})
+    )
+    assert lead.name == "2024"
+    assert lead.embedded.tags[0].name == "15"
+    field = CustomField.model_validate(payloads.custom_field(enums=[{"id": 1, "value": 5}]))
+    assert field.enum_id("5") == 1
+    value = CustomFieldValue.model_validate({"value": 3, "enum_id": 9, "enum_code": 1})
+    assert value.enum_code == "1"
+    assert value.value == 3  # values keep their JSON type
+    assert Lead.model_validate({"name": 1.5}).name == "1.5"
+    with pytest.raises(PydanticValidationError):
+        Lead.model_validate({"name": True})
 
 
 @pytest.mark.parametrize("embedded", [None, [], {"statuses": None}, {"statuses": []}])

@@ -5,7 +5,8 @@ account. Every model allows extra fields, so a field amoCRM adds later is kept (
 ``model_extra``) instead of breaking validation, and every documented field is optional,
 because what amoCRM returns depends on the method, the ``with`` parameter and the account.
 Object fields also accept ``[]``, which is how PHP's ``json_encode`` writes an empty
-associative array, and lists accept ``null``.
+associative array, lists accept ``null``, text fields accept JSON numbers (read as text) and
+number fields accept numeric text, as pydantic's lax mode does.
 
 ``_links`` and ``_embedded`` are exposed as :attr:`links` and :attr:`embedded`.
 """
@@ -59,6 +60,19 @@ def _php_object(value: Any) -> Any:
 
 #: A JSON object field that may arrive as ``[]`` when it is empty.
 _Object = Annotated[dict[str, Any] | None, BeforeValidator(_php_object)]
+
+
+def _number_as_text(value: Any) -> Any:
+    # PHP hands numeric-looking text (a lead named "2024", a select option "5", a request_id
+    # the caller sent as a number) to JSON as a number; text fields read it back as text.
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return str(value)
+    return value
+
+
+#: A text field that also accepts a JSON number.
+_Text = Annotated[str | None, BeforeValidator(_number_as_text)]
+_TextItem = Annotated[str, BeforeValidator(_number_as_text)]
 
 
 def _links_field() -> Any:
@@ -121,8 +135,8 @@ class Tag(AmoModel):
     """A tag in ``_embedded.tags``."""
 
     id: int | None = None
-    name: str | None = None
-    color: str | None = None
+    name: _Text = None
+    color: _Text = None
 
 
 class CustomFieldValue(AmoModel):
@@ -130,16 +144,16 @@ class CustomFieldValue(AmoModel):
 
     value: Any = None
     enum_id: int | None = None
-    enum_code: str | None = None
+    enum_code: _Text = None
 
 
 class CustomFieldValues(AmoModel):
     """One entry of ``custom_fields_values``: a field and its values."""
 
     field_id: int | None = None
-    field_name: str | None = None
-    field_code: str | None = None
-    field_type: str | None = None
+    field_name: _Text = None
+    field_code: _Text = None
+    field_type: _Text = None
     values: list[CustomFieldValue] | None = None
 
     def matches(self, key: FieldKey) -> bool:
@@ -154,7 +168,7 @@ class _Entity(AmoModel):
     """Fields and custom field helpers shared by leads, contacts and companies."""
 
     id: int | None = None
-    name: str | None = None
+    name: _Text = None
     responsible_user_id: int | None = None
     group_id: int | None = None
     created_by: int | None = None
@@ -296,8 +310,8 @@ class Contact(_Entity):
     ``is_main`` is set on the contacts embedded in a lead: it marks the main contact.
     """
 
-    first_name: str | None = None
-    last_name: str | None = None
+    first_name: _Text = None
+    last_name: _Text = None
     is_unsorted: bool | None = None
     is_main: bool | None = None
 
@@ -348,7 +362,7 @@ class Note(AmoModel):
 
     id: int | None = None
     entity_id: int | None = None
-    note_type: str | None = None
+    note_type: _Text = None
     params: _Object = None
     responsible_user_id: int | None = None
     group_id: int | None = None
@@ -374,7 +388,7 @@ class Note(AmoModel):
 class TaskResult(AmoModel):
     """The result written when a task was completed."""
 
-    text: str | None = None
+    text: _Text = None
 
 
 class Task(AmoModel):
@@ -385,9 +399,9 @@ class Task(AmoModel):
     """
 
     id: int | None = None
-    text: str | None = None
+    text: _Text = None
     entity_id: int | None = None
-    entity_type: str | None = None
+    entity_type: _Text = None
     task_type_id: int | None = None
     complete_till: int | None = None
     duration: int | None = None
@@ -413,11 +427,11 @@ class Status(AmoModel):
     """A stage of a pipeline. 142 is "won" and 143 is "lost" in every pipeline."""
 
     id: int | None = None
-    name: str | None = None
+    name: _Text = None
     sort: int | None = None
     is_editable: bool | None = None
     pipeline_id: int | None = None
-    color: str | None = None
+    color: _Text = None
     type: int | None = None
     account_id: int | None = None
     links: _Object = _links_field()
@@ -438,7 +452,7 @@ class Pipeline(AmoModel):
     """A lead pipeline (``/api/v4/leads/pipelines``)."""
 
     id: int | None = None
-    name: str | None = None
+    name: _Text = None
     sort: int | None = None
     is_main: bool | None = None
     is_unsorted_on: bool | None = None
@@ -470,7 +484,7 @@ class CustomFieldEnum(AmoModel):
     """One option of a select, multiselect or multitext field."""
 
     id: int | None = None
-    value: str | None = None
+    value: _Text = None
     sort: int | None = None
 
 
@@ -478,15 +492,15 @@ class CustomField(AmoModel):
     """A custom field definition (``/api/v4/{entity_type}/custom_fields``)."""
 
     id: int | None = None
-    name: str | None = None
-    type: str | None = None
-    code: str | None = None
+    name: _Text = None
+    type: _Text = None
+    code: _Text = None
     sort: int | None = None
     is_api_only: bool | None = None
     is_predefined: bool | None = None
     is_deletable: bool | None = None
-    entity_type: str | None = None
-    group_id: str | None = None
+    entity_type: _Text = None
+    group_id: _Text = None
     enums: list[CustomFieldEnum] | None = None
     account_id: int | None = None
     links: _Object = _links_field()
@@ -503,9 +517,9 @@ class User(AmoModel):
     """A user of the account (``/api/v4/users``)."""
 
     id: int | None = None
-    name: str | None = None
-    email: str | None = None
-    lang: str | None = None
+    name: _Text = None
+    email: _Text = None
+    lang: _Text = None
     rights: _Object = None
     links: _Object = _links_field()
 
@@ -514,24 +528,24 @@ class Account(AmoModel):
     """The account (``/api/v4/account``)."""
 
     id: int | None = None
-    name: str | None = None
-    subdomain: str | None = None
+    name: _Text = None
+    subdomain: _Text = None
     created_at: int | None = None
     created_by: int | None = None
     updated_at: int | None = None
     updated_by: int | None = None
     current_user_id: int | None = None
-    country: str | None = None
-    currency: str | None = None
-    currency_symbol: str | None = None
-    customers_mode: str | None = None
+    country: _Text = None
+    currency: _Text = None
+    currency_symbol: _Text = None
+    customers_mode: _Text = None
     is_unsorted_on: bool | None = None
     is_loss_reason_enabled: bool | None = None
     is_helpbot_enabled: bool | None = None
     is_technical_account: bool | None = None
     contact_name_display_order: int | None = None
-    amojo_id: str | None = None
-    uuid: str | None = None
+    amojo_id: _Text = None
+    uuid: _Text = None
     version: int | None = None
     links: _Object = _links_field()
     embedded: dict[str, Any] | list[Any] | None = Field(
@@ -545,7 +559,7 @@ class EntityRef(AmoModel):
     """What a create or update answers for each item: its id and ``request_id``."""
 
     id: int | None = None
-    request_id: str | None = None
+    request_id: _Text = None
     updated_at: int | None = None
     entity_id: int | None = None
     links: _Object = _links_field()
@@ -557,7 +571,7 @@ class ComplexLeadResult(AmoModel):
     id: int | None = None
     contact_id: int | None = None
     company_id: int | None = None
-    request_id: list[str] = Field(default_factory=list)
+    request_id: list[_TextItem] = Field(default_factory=list)
     merged: bool | None = None
 
 
@@ -565,9 +579,9 @@ class Link(AmoModel):
     """A link between two entities (``/api/v4/{entity_type}/{id}/link``)."""
 
     entity_id: int | None = None
-    entity_type: str | None = None
+    entity_type: _Text = None
     to_entity_id: int | None = None
-    to_entity_type: str | None = None
+    to_entity_type: _Text = None
     metadata: _Object = None
 
 

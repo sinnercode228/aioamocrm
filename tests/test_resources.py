@@ -339,6 +339,28 @@ async def test_complex_leads_are_batched(amo: AmoCRMClient, mock: respx.MockRout
     assert len(results) == 60
 
 
+async def test_numeric_request_ids_do_not_break_the_answer_of_a_saved_write(
+    amo: AmoCRMClient, mock: respx.MockRouter
+) -> None:
+    # The documentation says request_id comes back unchanged, so a caller who sent numbers
+    # gets numbers. The leads are saved by then: failing to read the answer would lose
+    # their ids and invite a retry that creates them again.
+    mock.post("/api/v4/leads").mock(
+        return_value=httpx.Response(
+            200, json={"_embedded": {"leads": [{"id": 10, "request_id": 7, "name": 2024}]}}
+        )
+    )
+    mock.post("/api/v4/leads/complex").mock(
+        return_value=httpx.Response(200, json=[{"id": 11, "contact_id": 12, "request_id": [7]}])
+    )
+
+    [ref] = await amo.leads.create([{"name": "Order 7", "request_id": 7}])
+    [result] = await amo.leads.create_complex([{"name": "Order 7", "request_id": 7}])
+
+    assert (ref.id, ref.request_id) == (10, "7")
+    assert (result.id, result.contact_id, result.request_id) == (11, 12, ["7"])
+
+
 # ---- notes ----------------------------------------------------------------------------------
 
 
