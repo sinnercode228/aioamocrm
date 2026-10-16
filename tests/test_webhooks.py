@@ -8,6 +8,7 @@ recorded from a live account.
 
 from __future__ import annotations
 
+import time
 from urllib.parse import quote, urlencode
 
 import pytest
@@ -231,6 +232,25 @@ def test_append_brackets_and_sparse_indexes() -> None:
     )
     assert [e.id for e in webhook.events] == [1, 6]
     assert webhook.events[0].payload["tags"] == ["a", "b"]
+
+
+def test_append_brackets_take_the_index_after_the_highest_one() -> None:
+    # As PHP does: a[] goes after the highest index so far, explicit or appended.
+    event = only(parse_webhook(b"leads[add][0][t][]=x&leads[add][0][t][7]=y&leads[add][0][t][]=z"))
+    assert event.payload["t"] == ["x", "y", "z"]
+    replaced = only(parse_webhook(b"leads[add][0][t][]=1&leads[add][0][t]=s&leads[add][0][t][]=2"))
+    assert replaced.payload["t"] == ["2"]
+
+
+def test_many_append_brackets_parse_in_linear_time() -> None:
+    # max_fields bounds the work, so a body at the limit must stay cheap to parse: finding
+    # the next index by scanning every key made this quadratic (seconds of blocked loop).
+    body = "&".join(["leads[add][0][id]=1"] + ["leads[add][0][tags][]=t"] * 9_999).encode()
+    started = time.perf_counter()
+    event = only(parse_webhook(body))
+    elapsed = time.perf_counter() - started
+    assert len(event.payload["tags"]) == 9_999
+    assert elapsed < 1.0
 
 
 def test_a_single_item_without_an_index() -> None:

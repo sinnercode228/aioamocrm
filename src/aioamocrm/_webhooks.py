@@ -19,7 +19,6 @@ recorded from a live account here.
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import parse_qsl
@@ -39,9 +38,21 @@ def _is_index(key: str) -> bool:
     return key.isascii() and key.isdigit()
 
 
-def _next_index(node: Mapping[str, Any]) -> str:
-    indexes = [int(key) for key in node if _is_index(key)]
-    return str(max(indexes) + 1 if indexes else 0)
+class _Node(dict[str, Any]):
+    """A dict that remembers the index a ``[]`` goes to next, so appending is O(1)."""
+
+    __slots__ = ("next_index",)
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.next_index = 0
+
+    def key(self, segment: str) -> str:
+        """Return the key ``segment`` names here; ``""`` appends after the highest index."""
+        key = segment or str(self.next_index)
+        if _is_index(key):
+            self.next_index = max(self.next_index, int(key) + 1)
+        return key
 
 
 def _listify(value: Any) -> Any:
@@ -80,7 +91,7 @@ def parse_form(body: bytes | str, *, max_fields: int = 10_000) -> dict[str, Any]
         msg = f"the webhook body has more than {max_fields} fields"
         raise ValueError(msg) from exc
 
-    root: dict[str, Any] = {}
+    root = _Node()
     for key, value in pairs:
         match = _KEY.fullmatch(key)
         if match is None:
@@ -92,13 +103,13 @@ def parse_form(body: bytes | str, *, max_fields: int = 10_000) -> dict[str, Any]
             raise ValueError(msg)
         node = root
         for segment in segments[:-1]:
-            name = segment or _next_index(node)
+            name = node.key(segment)
             child = node.get(name)
-            if not isinstance(child, dict):
-                child = {}
+            if not isinstance(child, _Node):
+                child = _Node()
                 node[name] = child
             node = child
-        node[segments[-1] or _next_index(node)] = value
+        node[node.key(segments[-1])] = value
     result: dict[str, Any] = _listify(root)
     return result
 
