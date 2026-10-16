@@ -207,3 +207,19 @@ async def test_a_next_link_without_limit_keeps_the_page_size(
     assert ids == [1, 2, 3, 4, 5, 6, 7]
     assert [call.request.url.params["page"] for call in route.calls] == ["1", "2", "3"]
     assert [call.request.url.params["limit"] for call in route.calls] == ["3", "3", "3"]
+
+
+@pytest.mark.parametrize("stuck_on", [1, 2])
+async def test_a_next_link_that_does_not_move_forward_is_not_followed(
+    amo: AmoCRMClient, mock: respx.MockRouter, stuck_on: int
+) -> None:
+    # A next link that keeps pointing at the same page (or back) must neither loop over
+    # pages already seen nor skip the ones after them.
+    route = mock.get("/api/v4/leads").mock(
+        side_effect=numbered_leads(10, lambda number: f"{API}/leads?page={stuck_on}&limit=3")
+    )
+
+    ids = [lead.id async for lead in amo.leads.iterate(limit=3)]
+
+    assert ids == list(range(1, 11))
+    assert [call.request.url.params["page"] for call in route.calls] == ["1", "2", "3", "4"]

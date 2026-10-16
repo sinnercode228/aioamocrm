@@ -31,7 +31,8 @@ All notable changes to this project are documented here. The format follows
   followed (the token would go with them) and are raised naming where they pointed. Batched
   writes report `batch_offset` and the `completed` results of the chunks saved before a
   failure.
-- Lists: `iterate()` async iterators that follow `_links.next` and stop on 204, on a short
+- Lists: `iterate()` async iterators that follow `_links.next` (only when it names the next
+  page number, so a stuck link can neither loop nor skip pages) and stop on 204, on a short
   page or without a next link, and `get_page()`; `filter`, `order`, `with_`, `query` encoded in
   PHP bracket notation. An empty list (204 No Content) is an empty result.
 - Resources: leads, contacts and companies (get, create and update in batches, link, unlink,

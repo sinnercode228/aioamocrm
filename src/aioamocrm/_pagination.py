@@ -110,10 +110,11 @@ async def iterate_pages(
 ) -> AsyncIterator[ModelT]:
     """Yield the items of every page, from page 1.
 
-    ``query`` holds everything but ``page`` and ``limit``. The walk follows ``_links.next``
-    when it points into the account's API (otherwise it asks for the next page number with the
-    same parameters) and stops at the first page that is empty (204), shorter than ``limit``,
-    or has no ``next`` link.
+    ``query`` holds everything but ``page`` and ``limit``. Every request asks for the page after
+    the last one, so the walk never goes back or stands still. It follows ``_links.next`` when
+    that link points into the account's API and names exactly that page; otherwise it asks for
+    the page number itself, with the same parameters. It stops at the first page that is empty
+    (204), shorter than ``limit``, or has no ``next`` link.
     """
     number = 1
     url = path
@@ -126,11 +127,12 @@ async def iterate_pages(
         if page.next_url is None or len(page.items) < limit:
             return
         number += 1
-        if client.owns_url(page.next_url) and page.next_url != url:
+        link = httpx.URL(page.next_url) if client.owns_url(page.next_url) else None
+        if link is not None and link.params.get_list("page") == [str(number)]:
             # Follow the link, adding back any parameter it left out (such as with=). That
             # includes limit: without it the server would use its default page size, the page
             # would look short next to ours and the walk would end early.
-            present = {name for name, _ in httpx.URL(page.next_url).params.multi_items()}
+            present = {name for name, _ in link.params.multi_items()}
             url = page.next_url
             params = [
                 (name, value)
