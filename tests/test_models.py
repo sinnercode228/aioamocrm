@@ -68,6 +68,25 @@ def test_php_empty_arrays_and_nulls_are_tolerated() -> None:
     assert task.result is None
 
 
+def test_php_empty_arrays_in_object_fields_are_tolerated() -> None:
+    # PHP's json_encode writes an empty associative array as [], so any object field may
+    # arrive as []; one such entity must not break a whole page.
+    assert Lead.model_validate(payloads.lead(_links=[])).links is None
+    assert Note.model_validate(payloads.note(params=[])).params is None
+    assert Note.model_validate(payloads.note(params=[])).text is None
+    assert User.model_validate(payloads.user(rights=[])).rights is None
+    link = Link.model_validate({"to_entity_id": 1, "to_entity_type": "contacts", "metadata": []})
+    assert link.metadata is None
+    assert EntityRef.model_validate({"id": 1, "_links": []}).links is None
+
+
+@pytest.mark.parametrize("embedded", [None, [], {"statuses": None}, {"statuses": []}])
+def test_a_pipeline_without_statuses_is_tolerated(embedded: object) -> None:
+    pipeline = Pipeline.model_validate({"id": 1, "name": "Main", "_embedded": embedded})
+    assert pipeline.statuses == []
+    assert pipeline.status(142) is None
+
+
 def test_field_helpers_read_by_code_and_by_id() -> None:
     contact = Contact.model_validate(payloads.contact())
 

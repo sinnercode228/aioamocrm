@@ -4,6 +4,8 @@ Field names and shapes follow the amoCRM v4 documentation and were not checked a
 account. Every model allows extra fields, so a field amoCRM adds later is kept (in
 ``model_extra``) instead of breaking validation, and every documented field is optional,
 because what amoCRM returns depends on the method, the ``with`` parameter and the account.
+Object fields also accept ``[]``, which is how PHP's ``json_encode`` writes an empty
+associative array, and lists accept ``null``.
 
 ``_links`` and ``_embedded`` are exposed as :attr:`links` and :attr:`embedded`.
 """
@@ -11,9 +13,9 @@ because what amoCRM returns depends on the method, the ``with`` parameter and th
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
+from pydantic import AliasChoices, BaseModel, BeforeValidator, ConfigDict, Field, field_validator
 
 __all__ = [
     "Account",
@@ -47,6 +49,16 @@ FieldKey = int | str
 _READ_ONLY = frozenset({"_links", "account_id", "is_deleted", "closest_task_at"})
 # Parts of a custom_fields_values entry that only describe the field.
 _FIELD_DESCRIPTION = frozenset({"field_name", "field_type"})
+
+
+def _php_object(value: Any) -> Any:
+    # PHP's json_encode writes an empty associative array as [], so an object amoCRM has
+    # nothing to put in may arrive as [] instead of {} or null.
+    return None if value == [] else value
+
+
+#: A JSON object field that may arrive as ``[]`` when it is empty.
+_Object = Annotated[dict[str, Any] | None, BeforeValidator(_php_object)]
 
 
 def _links_field() -> Any:
@@ -153,7 +165,7 @@ class _Entity(AmoModel):
     closest_task_at: int | None = None
     is_deleted: bool | None = None
     custom_fields_values: list[CustomFieldValues] | None = None
-    links: dict[str, Any] | None = _links_field()
+    links: _Object = _links_field()
     embedded: Embedded = Field(
         default_factory=lambda: Embedded(),  # noqa: PLW0108 - Embedded is defined below
         validation_alias=AliasChoices("_embedded", "embedded"),
@@ -337,7 +349,7 @@ class Note(AmoModel):
     id: int | None = None
     entity_id: int | None = None
     note_type: str | None = None
-    params: dict[str, Any] | None = None
+    params: _Object = None
     responsible_user_id: int | None = None
     group_id: int | None = None
     created_by: int | None = None
@@ -345,7 +357,7 @@ class Note(AmoModel):
     created_at: int | None = None
     updated_at: int | None = None
     account_id: int | None = None
-    links: dict[str, Any] | None = _links_field()
+    links: _Object = _links_field()
 
     @classmethod
     def common(cls, entity_id: int, text: str) -> Note:
@@ -388,7 +400,7 @@ class Task(AmoModel):
     created_at: int | None = None
     updated_at: int | None = None
     account_id: int | None = None
-    links: dict[str, Any] | None = _links_field()
+    links: _Object = _links_field()
 
     @field_validator("result", mode="before")
     @classmethod
@@ -408,13 +420,18 @@ class Status(AmoModel):
     color: str | None = None
     type: int | None = None
     account_id: int | None = None
-    links: dict[str, Any] | None = _links_field()
+    links: _Object = _links_field()
 
 
 class PipelineEmbedded(AmoModel):
     """``_embedded`` of a pipeline."""
 
     statuses: list[Status] = Field(default_factory=list)
+
+    @field_validator("statuses", mode="before")
+    @classmethod
+    def _null_is_empty(cls, value: Any) -> Any:
+        return [] if value is None else value
 
 
 class Pipeline(AmoModel):
@@ -427,12 +444,17 @@ class Pipeline(AmoModel):
     is_unsorted_on: bool | None = None
     is_archive: bool | None = None
     account_id: int | None = None
-    links: dict[str, Any] | None = _links_field()
+    links: _Object = _links_field()
     embedded: PipelineEmbedded = Field(
         default_factory=PipelineEmbedded,
         validation_alias=AliasChoices("_embedded", "embedded"),
         serialization_alias="_embedded",
     )
+
+    @field_validator("embedded", mode="before")
+    @classmethod
+    def _empty_embedded(cls, value: Any) -> Any:
+        return {} if value is None or value == [] else value
 
     @property
     def statuses(self) -> list[Status]:
@@ -467,7 +489,7 @@ class CustomField(AmoModel):
     group_id: str | None = None
     enums: list[CustomFieldEnum] | None = None
     account_id: int | None = None
-    links: dict[str, Any] | None = _links_field()
+    links: _Object = _links_field()
 
     def enum_id(self, value: str) -> int | None:
         """Return the id of the option with this value (``"WORK"``, ``"Сайт"``)."""
@@ -484,8 +506,8 @@ class User(AmoModel):
     name: str | None = None
     email: str | None = None
     lang: str | None = None
-    rights: dict[str, Any] | None = None
-    links: dict[str, Any] | None = _links_field()
+    rights: _Object = None
+    links: _Object = _links_field()
 
 
 class Account(AmoModel):
@@ -511,7 +533,7 @@ class Account(AmoModel):
     amojo_id: str | None = None
     uuid: str | None = None
     version: int | None = None
-    links: dict[str, Any] | None = _links_field()
+    links: _Object = _links_field()
     embedded: dict[str, Any] | list[Any] | None = Field(
         default=None,
         validation_alias=AliasChoices("_embedded", "embedded"),
@@ -526,7 +548,7 @@ class EntityRef(AmoModel):
     request_id: str | None = None
     updated_at: int | None = None
     entity_id: int | None = None
-    links: dict[str, Any] | None = _links_field()
+    links: _Object = _links_field()
 
 
 class ComplexLeadResult(AmoModel):
@@ -546,7 +568,7 @@ class Link(AmoModel):
     entity_type: str | None = None
     to_entity_id: int | None = None
     to_entity_type: str | None = None
-    metadata: dict[str, Any] | None = None
+    metadata: _Object = None
 
 
 for _model in (Lead, Contact, Company, Embedded):
