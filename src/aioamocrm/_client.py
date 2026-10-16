@@ -39,7 +39,8 @@ DOMAINS = ("amocrm.ru", "amocrm.com", "kommo.com")
 _SUBDOMAIN = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
 _TOO_MANY_REQUESTS = 429
 _UNAUTHORIZED = 401
-_FIRST_ERROR_STATUS = 400
+_SUCCESS_FIRST = 200
+_SUCCESS_END = 300
 
 # Failures that happen before a single byte of the request is sent: safe to retry for any method.
 _NOT_SENT = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
@@ -325,6 +326,9 @@ class AmoCRMClient:
                     await _sleep(wait)
                     attempt += 1
                     continue
-            if status >= _FIRST_ERROR_STATUS:
+            # Anything but 2xx is an error. A redirect (an account moved to another domain,
+            # http:// instead of https://) usually has an empty body that would otherwise
+            # read as "204, nothing there".
+            if not _SUCCESS_FIRST <= status < _SUCCESS_END:
                 raise error_from_response(response)
             return response

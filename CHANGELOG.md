@@ -25,8 +25,10 @@ All notable changes to this project are documented here. The format follows
   for idempotent methods unless the call passes `retry=True`.
 - Typed errors: `AmoCRMError` and `AuthError`, `PaymentRequiredError`, `ForbiddenError`,
   `NotFoundError`, `ValidationError` (with every `ValidationIssue`), `RateLimitError`,
-  `ServerError`, `NetworkError`. Batched writes report `batch_offset` and the `completed`
-  results of the chunks saved before a failure.
+  `ServerError`, `NetworkError`. Any answer outside 2xx is an error: redirects are not
+  followed (the token would go with them) and are raised naming where they pointed. Batched
+  writes report `batch_offset` and the `completed` results of the chunks saved before a
+  failure.
 - Lists: `iterate()` async iterators that follow `_links.next` and stop on 204, on a short
   page or without a next link, and `get_page()`; `filter`, `order`, `with_`, `query` encoded in
   PHP bracket notation. An empty list (204 No Content) is an empty result.

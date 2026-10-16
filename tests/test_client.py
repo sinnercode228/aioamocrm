@@ -100,6 +100,36 @@ async def test_errors_are_raised_typed(amo: AmoCRMClient, mock: respx.MockRouter
         await amo.request("GET", "leads/1")
 
 
+@pytest.mark.parametrize("status", [301, 302, 307, 308])
+async def test_a_redirect_is_an_error_not_an_empty_list(
+    amo: AmoCRMClient, mock: respx.MockRouter, status: int
+) -> None:
+    # An account moved to another domain, or http:// instead of https://. The body is empty,
+    # which must not read as "204, nothing there".
+    moved = {"Location": "https://example.kommo.com/api/v4/leads?page=1&limit=250"}
+    mock.get("/api/v4/leads").mock(return_value=httpx.Response(status, headers=moved))
+    mock.get("/api/v4/leads/7").mock(return_value=httpx.Response(status, headers=moved))
+
+    with pytest.raises(AmoCRMError) as caught:
+        [lead async for lead in amo.leads.iterate()]
+    assert caught.value.status_code == status
+    assert "https://example.kommo.com/api/v4/leads" in str(caught.value)
+    assert "limit=250" not in str(caught.value)
+
+    with pytest.raises(AmoCRMError) as caught:
+        await amo.leads.get(7)
+    assert type(caught.value) is AmoCRMError
+    assert caught.value.status_code == status
+
+
+async def test_a_redirect_without_a_location_is_still_an_error(
+    amo: AmoCRMClient, mock: respx.MockRouter
+) -> None:
+    mock.get("/api/v4/account").mock(return_value=httpx.Response(304))
+    with pytest.raises(AmoCRMError, match="HTTP 304"):
+        await amo.request("GET", "account")
+
+
 async def test_absolute_urls_must_stay_on_the_account(
     amo: AmoCRMClient, mock: respx.MockRouter
 ) -> None:

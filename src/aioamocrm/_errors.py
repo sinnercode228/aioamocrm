@@ -230,11 +230,30 @@ _BY_STATUS: dict[int, type[AmoCRMError]] = {
 }
 
 
+_REDIRECT_FIRST = 300
+_REDIRECT_END = 400
+
+
+def _redirect_note(url: httpx.URL, location: str | None) -> str:
+    hint = "check the subdomain, domain or base_url"
+    if location:
+        try:
+            target = url.join(location).copy_with(query=None, fragment=None)
+        except (httpx.InvalidURL, ValueError):
+            pass
+        else:
+            return f": redirected to {target}; {hint}"
+    return f": redirected; {hint}"
+
+
 def error_from_response(response: httpx.Response) -> AmoCRMError:
     """Build the typed exception for an error answer.
 
+    A 3xx is an error too: the client does not follow redirects (the token would go with
+    them), so it is raised as :class:`AmoCRMError` naming where it pointed, without the query.
+
     Args:
-        response: An answer with a 4xx or 5xx status; its request must be set.
+        response: An answer with a 3xx, 4xx or 5xx status; its request must be set.
 
     Returns:
         The exception to raise. Its message names the method, the path (never the query string,
@@ -257,6 +276,8 @@ def error_from_response(response: httpx.Response) -> AmoCRMError:
     elif isinstance(body, str) and body.strip():
         parts.append(f": {_short(body.strip())}")
     parts.append(f" ({request.method} {url.path})")
+    if _REDIRECT_FIRST <= status < _REDIRECT_END:
+        parts.append(_redirect_note(request.url, response.headers.get("Location")))
     message = "".join(parts)
 
     common: dict[str, Any] = {

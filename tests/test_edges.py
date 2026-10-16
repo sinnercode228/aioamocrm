@@ -8,6 +8,7 @@ import respx
 
 from aioamocrm import (
     AmoCRMClient,
+    AmoCRMError,
     AuthError,
     JsonFileTokenStorage,
     LongLivedToken,
@@ -103,6 +104,17 @@ def test_validation_errors_that_are_not_a_list() -> None:
         error = error_from_response(httpx.Response(400, json=body, request=request))
         assert isinstance(error, ValidationError)
         assert error.errors == []
+
+
+def test_a_redirect_to_an_unreadable_location_is_still_described() -> None:
+    # httpx itself refuses such answers on the wire; error_from_response must not choke either.
+    request = httpx.Request("GET", "https://example.amocrm.ru/api/v4/users")
+    answer = httpx.Response(302, headers={"Location": "https://x:notaport/"}, request=request)
+    error = error_from_response(answer)
+    assert type(error) is AmoCRMError
+    assert str(error) == (
+        "HTTP 302 (GET /api/v4/users): redirected; check the subdomain, domain or base_url"
+    )
 
 
 def test_webhook_custom_fields_sent_as_objects() -> None:
