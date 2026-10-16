@@ -17,7 +17,9 @@ from aioamocrm import (
 )
 
 
-def token(access: str = "access-1", refresh: str = "refresh-1", expires_at: float = 1000.0) -> TokenSet:
+def token(
+    access: str = "access-1", refresh: str = "refresh-1", expires_at: float = 1000.0
+) -> TokenSet:
     return TokenSet(access_token=access, refresh_token=refresh, expires_at=expires_at)
 
 
@@ -180,5 +182,5 @@ async def test_json_file_storage_creates_missing_parent_directories(tmp_path: Pa
 async def test_a_corrupted_file_is_an_auth_error(tmp_path: Path, content: str) -> None:
     path = tmp_path / "tokens.json"
     path.write_text(content, encoding="utf-8")
-    with pytest.raises(AuthError, match="tokens.json"):
+    with pytest.raises(AuthError, match=r"tokens\.json"):
         await JsonFileTokenStorage(path).load()

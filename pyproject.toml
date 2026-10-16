@@ -81,10 +81,11 @@ select = [
   "E", "W", "F", "I", "B", "UP", "SIM", "ASYNC", "RUF", "S", "PT", "RET", "C4", "PL",
   "D", "ANN", "TID", "T20", "LOG", "G", "DTZ", "PIE", "PERF", "FBT",
 ]
-ignore = ["D203", "D213", "D105", "D107", "PLR0913", "FBT001"]
+# ANN401: JSON bodies and payloads are typed as Any on purpose.
+ignore = ["D203", "D213", "D105", "D107", "PLR0913", "FBT001", "ANN401"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "S105", "S106", "S107", "PLR2004", "D", "ANN401", "PLC0415", "FBT"]
+"tests/**" = ["S101", "S105", "S106", "S107", "PLR2004", "D", "PLC0415", "FBT", "ASYNC240"]
 "examples/**" = ["D", "S105", "PLR2004", "T201"]
 
 [tool.ruff.lint.pydocstyle]

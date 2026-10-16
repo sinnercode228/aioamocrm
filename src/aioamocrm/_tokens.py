@@ -42,7 +42,7 @@ class TokenSet:
     access_token: str = field(repr=False)
     refresh_token: str = field(repr=False)
     expires_at: float
-    token_type: str = "Bearer"
+    token_type: str = "Bearer"  # noqa: S105 - a token type, not a secret
 
     def expires_within(self, seconds: float, *, now: float) -> bool:
         """Tell whether the access token expires less than ``seconds`` after ``now``."""

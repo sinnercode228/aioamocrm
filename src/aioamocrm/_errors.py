@@ -11,6 +11,7 @@ they were not checked against a live account, so every field is read defensively
 from __future__ import annotations
 
 import email.utils
+import math
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -161,7 +162,7 @@ def parse_retry_after(value: str | None, *, now: float | None = None) -> float |
     except ValueError:
         pass
     else:
-        return max(0.0, seconds) if seconds == seconds else None  # NaN is not a delay
+        return max(0.0, seconds) if math.isfinite(seconds) else None
     try:
         moment = email.utils.parsedate_to_datetime(text)
     except (TypeError, ValueError, IndexError):

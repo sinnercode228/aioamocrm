@@ -124,7 +124,12 @@ def test_malformed_validation_entries_are_skipped() -> None:
     ],
 )
 def test_status_codes_map_to_typed_errors(status: int, kind: type[AmoCRMError]) -> None:
-    body = {"title": "T", "type": f"https://httpstatus.es/{status}", "status": status, "detail": "D"}
+    body = {
+        "title": "T",
+        "type": f"https://httpstatus.es/{status}",
+        "status": status,
+        "detail": "D",
+    }
     error = error_from_response(response(status, body))
     assert type(error) is kind
     assert error.status_code == status
