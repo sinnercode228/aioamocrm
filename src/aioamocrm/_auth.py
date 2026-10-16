@@ -29,6 +29,18 @@ logger = logging.getLogger(__name__)
 _HTTP_OK = 200
 
 
+def _newest(stored: TokenSet | None, current: TokenSet | None) -> TokenSet | None:
+    """Pick the token set whose refresh token is the live one.
+
+    Every refresh gives a later ``expires_at``, so the newer set holds the refresh token amoCRM
+    still accepts. The storage is behind memory when the last save failed, and ahead of it when
+    another process sharing the storage refreshed.
+    """
+    if stored is None or current is None:
+        return stored if stored is not None else current
+    return current if current.expires_at > stored.expires_at else stored
+
+
 @dataclass(frozen=True)
 class TokenEndpoint:
     """The OAuth2 token endpoint of one account and the HTTP client to reach it.
@@ -234,7 +246,7 @@ class OAuth2:
                 logger.info("OAuth2 tokens renewed elsewhere were loaded from the storage")
                 self._tokens = stored
                 return stored
-            base = stored if stored is not None else current
+            base = _newest(stored, current)
             if base is None:
                 msg = "no OAuth2 tokens yet: call exchange_code() with an authorization code first"
                 raise AuthError(msg)

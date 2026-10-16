@@ -240,6 +240,42 @@ async def test_a_failed_refresh_raises_auth_error_and_keeps_the_old_tokens(
     assert await storage.load() == old
 
 
+class SaveFailsOnce(MemoryTokenStorage):
+    """A storage whose first save fails, as a full disk or a database outage would."""
+
+    def __init__(self, tokens: TokenSet | None = None) -> None:
+        super().__init__(tokens)
+        self.failures = 1
+
+    async def save(self, tokens: TokenSet) -> None:
+        if self.failures:
+            self.failures -= 1
+            msg = "disk full"
+            raise OSError(msg)
+        await super().save(tokens)
+
+
+async def test_after_a_failed_save_the_next_refresh_uses_the_refresh_token_kept_in_memory(
+    endpoint: TokenEndpoint, mock: respx.MockRouter
+) -> None:
+    route = mock.post(TOKEN_URL).mock(side_effect=[token_answer(2, 100), token_answer(3)])
+    clock = Clock()
+    storage = SaveFailsOnce(valid_tokens(1, expires_at=NOW))
+    auth = oauth(storage, clock)
+
+    with pytest.raises(OSError, match="disk full"):
+        await auth.get_token(endpoint)
+    # refresh-1 is spent now; refresh-2 exists only in memory, the storage still has set 1.
+    assert await auth.get_token(endpoint) == "access-2"
+
+    clock.now = NOW + 100
+    assert await auth.get_token(endpoint) == "access-3"
+    assert json.loads(route.calls[1].request.content)["refresh_token"] == "refresh-2"
+    saved = await storage.load()
+    assert saved is not None
+    assert saved.refresh_token == "refresh-3"
+
+
 async def test_an_unreadable_token_answer_is_an_auth_error(
     endpoint: TokenEndpoint, mock: respx.MockRouter
 ) -> None:
