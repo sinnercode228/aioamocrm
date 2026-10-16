@@ -43,6 +43,7 @@ from ._ratelimit import RateLimiter
 from ._retry import RetryPolicy
 from ._tokens import JsonFileTokenStorage, MemoryTokenStorage, TokenSet, TokenStorage
 from ._version import __version__
+from ._webhooks import Webhook, WebhookEvent, parse_webhook
 
 __all__ = [
     "DOMAINS",
@@ -90,5 +91,8 @@ __all__ = [
     "User",
     "ValidationError",
     "ValidationIssue",
+    "Webhook",
+    "WebhookEvent",
     "__version__",
+    "parse_webhook",
 ]
