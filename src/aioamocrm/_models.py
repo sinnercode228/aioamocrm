@@ -166,6 +166,19 @@ class _Entity(AmoModel):
         # PHP serialises an empty associative array as [].
         return {} if value is None or value == [] else value
 
+    def to_api(self) -> dict[str, Any]:
+        """Return the JSON body for a write request; see :meth:`AmoModel.to_api`.
+
+        ``_embedded`` is included whenever it holds something, also when it was filled by
+        appending to the default (``lead.embedded.tags.append(Tag(name="site"))``).
+        """
+        data = super().to_api()
+        data.pop("_embedded", None)
+        embedded = self.embedded.to_api()
+        if embedded:
+            data["_embedded"] = embedded
+        return data
+
     def field(self, key: FieldKey) -> CustomFieldValues | None:
         """Return the custom field with this ``field_id`` (int) or ``field_code`` (str)."""
         _check_key(key)
@@ -302,6 +315,20 @@ class Embedded(AmoModel):
     @classmethod
     def _null_is_empty(cls, value: Any) -> Any:
         return [] if value is None else value
+
+    def to_api(self) -> dict[str, Any]:
+        """Return the non-empty lists (each item through its own ``to_api``) and the extras."""
+        data: dict[str, Any] = {}
+        for name in type(self).model_fields:
+            items = getattr(self, name)
+            if items:
+                data[name] = [
+                    item.to_api() if isinstance(item, AmoModel) else _clean(item) for item in items
+                ]
+        for name, value in (self.model_extra or {}).items():
+            if value is not None:
+                data[name] = _clean(value)
+        return data
 
 
 class Note(AmoModel):

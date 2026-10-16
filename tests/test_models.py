@@ -288,3 +288,24 @@ def test_users_account_refs_links() -> None:
         }
     )
     assert link.to_entity_type == "contacts"
+
+
+def test_appending_to_the_default_embedded_is_sent() -> None:
+    lead = Lead(name="Заявка")
+    lead.embedded.tags.append(Tag(name="site"))
+    lead.embedded.contacts.append(Contact(name="Иван"))
+    assert lead.to_api() == {
+        "name": "Заявка",
+        "_embedded": {"tags": [{"name": "site"}], "contacts": [{"name": "Иван"}]},
+    }
+    assert Lead(name="x", embedded=Embedded()).to_api() == {"name": "x"}
+
+
+def test_embedded_extras_are_sent_too() -> None:
+    lead = Lead.model_validate(
+        {"name": "x", "_embedded": {"source": {"external_id": "form-1", "type": "widget"}}}
+    )
+    assert lead.to_api() == {
+        "name": "x",
+        "_embedded": {"source": {"external_id": "form-1", "type": "widget"}},
+    }
