@@ -3,9 +3,11 @@ from __future__ import annotations
 import asyncio
 import itertools
 
+import httpx
 import pytest
+import respx
 
-from aioamocrm import RateLimiter
+from aioamocrm import AmoCRMClient, LongLivedToken, RateLimiter
 
 
 class FakeClock:
@@ -82,3 +84,17 @@ def test_the_rate_is_configurable_and_validated() -> None:
     for bad in (0, -1, float("inf"), float("nan")):
         with pytest.raises(ValueError, match="rate"):
             RateLimiter(bad)
+
+
+async def test_client_requests_are_spaced_by_its_limiter() -> None:
+    clock = FakeClock()
+    limiter = limiter_with(clock)
+    with respx.mock(base_url="https://example.amocrm.ru") as mock:
+        route = mock.get("/api/v4/account").mock(return_value=httpx.Response(200, json={}))
+        async with AmoCRMClient(
+            subdomain="example", auth=LongLivedToken("t"), rate_limit=limiter
+        ) as amo:
+            await asyncio.gather(*(amo.request("GET", "account") for _ in range(4)))
+
+    assert route.call_count == 4
+    assert clock.sleeps == pytest.approx([1 / 7, 2 / 7, 3 / 7])
