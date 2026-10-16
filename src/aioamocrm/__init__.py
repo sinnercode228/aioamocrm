@@ -13,6 +13,8 @@ from ._errors import (
     ValidationError,
     ValidationIssue,
 )
+from ._ratelimit import RateLimiter
+from ._retry import RetryPolicy
 from ._tokens import JsonFileTokenStorage, MemoryTokenStorage, TokenSet, TokenStorage
 
 __version__ = "0.1.0"
@@ -30,6 +32,8 @@ __all__ = [
     "OAuth2",
     "PaymentRequiredError",
     "RateLimitError",
+    "RateLimiter",
+    "RetryPolicy",
     "ServerError",
     "TokenEndpoint",
     "TokenSet",
