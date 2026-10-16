@@ -55,12 +55,38 @@ async def test_429_without_retry_after_backs_off_with_jitter(
     assert 1.0 <= sleeps[1] <= 2.0
 
 
-async def test_429_is_retried_for_post_because_it_was_not_processed(
-    amo: AmoCRMClient, mock: respx.MockRouter
+@pytest.mark.parametrize("method", ["POST", "PATCH"])
+async def test_429_is_not_retried_for_writes_by_default(
+    amo: AmoCRMClient, mock: respx.MockRouter, method: str
 ) -> None:
-    route = mock.post("/api/v4/leads").mock(side_effect=[httpx.Response(429, json=TOO_MANY), OK])
-    assert await amo.request("POST", "leads", json=[{"name": "x"}]) == {"id": 1}
+    # Nothing in the documentation promises that a 429 write was not applied, and amoCRM has
+    # no idempotency keys: sending it again could create the lead twice.
+    route = mock.route(method=method, path="/api/v4/leads").mock(
+        side_effect=[httpx.Response(429, json=TOO_MANY, headers={"Retry-After": "1"}), OK]
+    )
+    with pytest.raises(RateLimitError) as caught:
+        await amo.request(method, "leads", json=[{"name": "x"}])
+    assert route.call_count == 1
+    assert caught.value.retry_after == 1.0
+
+
+@pytest.mark.parametrize("method", ["POST", "PATCH"])
+async def test_429_is_retried_for_writes_when_the_caller_opts_in(
+    amo: AmoCRMClient, mock: respx.MockRouter, method: str, sleeps: list[float]
+) -> None:
+    route = mock.route(method=method, path="/api/v4/leads").mock(
+        side_effect=[httpx.Response(429, json=TOO_MANY, headers={"Retry-After": "1"}), OK]
+    )
+    assert await amo.request(method, "leads", json=[{"name": "x"}], retry=True) == {"id": 1}
     assert route.call_count == 2
+    assert sleeps == [1.0]
+
+
+async def test_get_can_opt_out_of_429_retries(amo: AmoCRMClient, mock: respx.MockRouter) -> None:
+    route = mock.get("/api/v4/account").mock(side_effect=[httpx.Response(429), OK])
+    with pytest.raises(RateLimitError):
+        await amo.request("GET", "account", retry=False)
+    assert route.call_count == 1
 
 
 async def test_429_gives_up_after_the_last_attempt(

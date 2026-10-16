@@ -21,8 +21,9 @@ All notable changes to this project are documented here. The format follows
 - `RateLimiter`: requests spaced at 7 per second by default, configurable or shared between
   clients.
 - `RetryPolicy`: exponential backoff with jitter and `Retry-After`, a bounded number of
-  attempts; 429 and connection failures are retried for every method, 5xx and timeouts only
-  for idempotent methods unless the call passes `retry=True`.
+  attempts; failures to connect are retried for every method, 429, 5xx and timeouts only for
+  idempotent methods unless the call passes `retry=True`, so a write is never sent twice
+  without the caller asking for it.
 - Typed errors: `AmoCRMError` and `AuthError`, `PaymentRequiredError`, `ForbiddenError`,
   `NotFoundError`, `ValidationError` (with every `ValidationIssue`), `RateLimitError`,
   `ServerError`, `NetworkError`. Any answer outside 2xx is an error: redirects are not

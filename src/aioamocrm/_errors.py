@@ -93,7 +93,7 @@ class NotFoundError(AmoCRMError):
 
 
 class RateLimitError(AmoCRMError):
-    """HTTP 429 that was still there after the retries ran out.
+    """HTTP 429 on a write made without ``retry=True``, or still there after the retries ran out.
 
     Attributes:
         retry_after: Seconds from the ``Retry-After`` header, when amoCRM sent one.

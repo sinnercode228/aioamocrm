@@ -190,9 +190,10 @@ class AmoCRMClient:
             params: Query parameters; a mapping is flattened into PHP brackets
                 (``{"filter": {"id": [1]}}`` gives ``filter[id][0]=1``).
             json: JSON body.
-            retry: ``True`` to retry 5xx answers and broken connections whatever the method,
-                ``False`` to never retry them, ``None`` to retry them for idempotent methods
-                only. 429 answers and failures to connect are retried in every case.
+            retry: ``True`` to retry 429 and 5xx answers and broken connections whatever the
+                method, ``False`` to never retry them, ``None`` (the default) to retry them for
+                idempotent methods only. Failures to connect, where nothing was sent, are
+                retried in every case.
 
         Returns:
             The decoded JSON, or ``None`` for an empty answer (amoCRM answers ``204 No Content``
@@ -308,8 +309,8 @@ class AmoCRMClient:
                 reauthorized = True
                 logger.info("%s %s got 401; trying once more with a renewed token", method, path)
                 continue
-            retryable = status == _TOO_MANY_REQUESTS or (
-                status in policy.retry_statuses and unsafe_ok
+            retryable = unsafe_ok and (
+                status == _TOO_MANY_REQUESTS or status in policy.retry_statuses
             )
             if retryable and attempt < policy.max_attempts:
                 wait = self._retry_delay(response, attempt)

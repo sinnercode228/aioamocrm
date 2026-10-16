@@ -3,8 +3,9 @@
 Paths, bodies and answers follow the amoCRM v4 documentation and were not checked against a
 live account. Batch writes are split into chunks of ``batch_size`` items (50 by default; the
 documentation asks for at most 50 leads per ``/leads/complex`` call and allows up to 250
-items in other writes). Writes are not retried on 5xx or timeouts unless ``retry=True``: amoCRM
-has no idempotency keys, so a repeated ``POST`` may create the same lead twice.
+items in other writes). Writes are not retried on 429, 5xx or timeouts unless ``retry=True``:
+amoCRM has no idempotency keys, so a repeated ``POST`` may create the same lead twice. A failed
+chunk raises with ``batch_offset`` and the ``completed`` results, so the caller can resume.
 """
 
 from __future__ import annotations

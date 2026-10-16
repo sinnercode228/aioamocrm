@@ -14,12 +14,14 @@ class RetryPolicy:
 
     What is retried:
 
-    * HTTP 429, for every method: amoCRM rejected the request before doing anything.
     * Failures to connect, for every method: the request was never sent.
-    * HTTP 5xx in ``retry_statuses`` and broken connections or timeouts after the request was
-      sent, only for ``idempotent_methods`` (by default ``GET``, ``HEAD``, ``OPTIONS``), or for
-      any request made with ``retry=True``. A ``POST`` that timed out may have created the
-      lead, and sending it again would create a second one.
+    * HTTP 429, HTTP 5xx in ``retry_statuses``, and broken connections or timeouts after the
+      request was sent, only for ``idempotent_methods`` (by default ``GET``, ``HEAD``,
+      ``OPTIONS``), or for any request made with ``retry=True``. amoCRM has no idempotency
+      keys: a ``POST`` that timed out may have created the lead, and sending it again would
+      create a second one. A 429 most likely means the write was refused before anything
+      happened, but the documentation does not promise it, so writes are not resent on a 429
+      either unless the caller opts in.
 
     The delay is ``Retry-After`` when the answer has one, otherwise exponential backoff with
     jitter: attempt *n* waits a random time between half and all of
@@ -31,8 +33,9 @@ class RetryPolicy:
         backoff_max: Cap on the backoff delay, in seconds.
         max_retry_after: Longest ``Retry-After`` the client is willing to wait; a longer one
             is raised at once as :class:`~aioamocrm.RateLimitError` (or the error for its status).
-        retry_statuses: HTTP statuses retried for idempotent requests.
-        idempotent_methods: Methods whose 5xx and timeouts are retried without ``retry=True``.
+        retry_statuses: HTTP statuses retried for idempotent requests, besides 429.
+        idempotent_methods: Methods whose 429, 5xx and timeouts are retried without
+            ``retry=True``.
     """
 
     max_attempts: int = 4

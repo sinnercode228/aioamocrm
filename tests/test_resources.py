@@ -19,6 +19,7 @@ from aioamocrm import (
     Link,
     Note,
     NotFoundError,
+    RateLimitError,
     ServerError,
     Task,
     ValidationError,
@@ -162,6 +163,25 @@ async def test_create_does_not_retry_5xx_unless_asked(
     assert route.call_count == 1
     refs = await amo.leads.create([Lead(name="x")], retry=True)
     assert [ref.id for ref in refs] == [1]
+
+
+async def test_a_rate_limited_chunk_is_reported_not_sent_again(
+    amo: AmoCRMClient, mock: respx.MockRouter
+) -> None:
+    route = mock.post("/api/v4/leads/complex").mock(
+        side_effect=[
+            httpx.Response(200, json=[{"id": 1, "contact_id": 2, "request_id": ["0"]}]),
+            httpx.Response(429, json={"title": "Too Many Requests", "status": 429}),
+            httpx.Response(200, json=[{"id": 9, "contact_id": 9, "request_id": ["0"]}]),
+        ]
+    )
+
+    with pytest.raises(RateLimitError) as caught:
+        await amo.leads.create_complex([Lead(name="a"), Lead(name="b")], batch_size=1)
+
+    assert route.call_count == 2
+    assert caught.value.batch_offset == 1
+    assert [result.id for result in caught.value.completed] == [1]
 
 
 async def test_update_in_batches(amo: AmoCRMClient, mock: respx.MockRouter) -> None:
