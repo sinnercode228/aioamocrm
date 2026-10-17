@@ -45,7 +45,8 @@ All notable changes to this project are documented here. The format follows
   statuses, custom fields per entity type, users, account.
 - Pydantic v2 models that keep unknown fields, with `field()`, `field_value()`,
   `field_values()` and `set_field()` for custom fields by id or code (`PHONE` / `EMAIL` with
-  `enum_code`), and `to_api()` write bodies without the read-only parts.
+  `enum_code`), and `to_api()` write bodies without the read-only parts. `Lead.price` takes a
+  `float` for prices with minor currency units.
 - `parse_webhook()`: amoCRM form-encoded webhook bodies (`leads[add][0][id]`,
   `contacts[update][0][custom_fields][0][values][0][value]`, `account[subdomain]`...) into
   `WebhookEvent`s with `entity`, `action` and `payload`, framework-agnostic.

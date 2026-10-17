@@ -522,6 +522,8 @@ About the models in general: every field is optional, because what amoCRM return
 the endpoint, `with` and the account. Fields the model does not declare are kept in
 `model_extra`. The models also accept what PHP's `json_encode` produces: `[]` for an empty
 object, `null` for an empty list, and numbers in text fields (a lead named `2024`).
+`Lead.price` takes a `float` as well as an `int`, for accounts with minor currency units:
+`Lead(price=99.5)` sends `"price": 99.5`.
 
 ## Notes and tasks
 

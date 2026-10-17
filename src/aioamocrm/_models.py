@@ -293,9 +293,13 @@ class _Entity(AmoModel):
 
 
 class Lead(_Entity):
-    """A lead (``/api/v4/leads``)."""
+    """A lead (``/api/v4/leads``).
 
-    price: int | None = None
+    ``price`` is a whole number, or a ``float`` with cents where the account supports minor
+    currency units (the official PHP SDK says Kommo does).
+    """
+
+    price: int | float | None = None
     status_id: int | None = None
     pipeline_id: int | None = None
     loss_reason_id: int | None = None

@@ -200,6 +200,14 @@ def test_to_api_sends_only_what_was_set() -> None:
     assert Lead(id=5, price=None).to_api() == {"id": 5}
 
 
+def test_a_price_may_have_minor_units() -> None:
+    # Kommo accepts prices with cents; the official PHP SDK sends price as a float.
+    assert Lead(price=99.5).to_api() == {"price": 99.5}
+    whole = Lead(price=5000).to_api()["price"]
+    assert (whole, type(whole)) == (5000, int)
+    assert Lead.model_validate({"price": 1250.75}).price == 1250.75
+
+
 def test_to_api_drops_read_only_parts_of_a_fetched_entity() -> None:
     data = Contact.model_validate(payloads.contact()).to_api()
     for key in ("_links", "account_id", "is_deleted", "closest_task_at"):
