@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-10-17
+
+### Fixed
+
+- The README no longer says that 0.1.0 is not on PyPI, and the install section points at PyPI.
+  The project page on PyPI shows the README of the release, so this needs a new version. The
+  code is the same as in 0.1.0.
+
 ## [0.1.0] - 2026-10-17
 
 ### Added
@@ -70,4 +78,5 @@ All notable changes to this project are documented here. The format follows
   `Lead.price`, the tasks filter and `AccountMovedError` above), and what still rests on the
   documentation alone.
 
+[0.1.1]: https://github.com/sinnercode228/aioamocrm/releases/tag/v0.1.1
 [0.1.0]: https://github.com/sinnercode228/aioamocrm/releases/tag/v0.1.0

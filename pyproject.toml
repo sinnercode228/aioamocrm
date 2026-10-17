@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aioamocrm"
-version = "0.1.0"
+version = "0.1.1"
 description = "Async client for the amoCRM / Kommo API v4: OAuth2 with token rotation, rate limiting, retries, pagination, typed models and webhook parsing"
 readme = "README.md"
 license = "MIT"

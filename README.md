@@ -1041,7 +1041,7 @@ request and the answer, tokens removed.
 
 ## Limits and roadmap
 
-Limits of 0.1.0:
+Limits of the 0.1 releases:
 
 - Typed resources cover leads, contacts, companies, notes, tasks, pipelines and statuses, custom
   field definitions, users and the account. Customers, catalogs, unsorted leads, events, calls,
