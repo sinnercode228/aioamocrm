@@ -15,11 +15,10 @@ clean, ships `py.typed`.
 It grew out of the amoCRM connector in [Relay](https://github.com/sinnercode228/integration-hub),
 which creates leads with their contacts and notes and receives account webhooks.
 
-Version 0.1.0 is not on PyPI yet, and there is still no amoCRM account behind its tests: they
-run against mocked HTTP. I wrote the request and answer shapes from the amoCRM documentation and
-then cross-checked them against amoCRM's official PHP SDK.
-[What was checked and how](#what-was-checked-and-how) lists what the SDK confirms, what it made
-me fix, and what still rests on the documentation alone.
+There is still no amoCRM account behind its tests: they run against mocked HTTP. I wrote the
+request and answer shapes from the amoCRM documentation and then cross-checked them against
+amoCRM's official PHP SDK. [What was checked and how](#what-was-checked-and-how) lists what the
+SDK confirms, what it made me fix, and what still rests on the documentation alone.
 
 ## Why another client
 
@@ -61,7 +60,7 @@ What aioamocrm does, in mechanisms:
 pip install aioamocrm
 ```
 
-Until 0.1.0 is published, install from GitHub:
+The current `main` branch:
 `pip install "aioamocrm @ git+https://github.com/sinnercode228/aioamocrm"`.
 
 It needs Python 3.10 or newer, `httpx>=0.25,<1` and `pydantic>=2.5,<3`. CI runs Python 3.10 to
