@@ -34,8 +34,9 @@ All notable changes to this project are documented here. The format follows
   `title`, `detail` and `hint`. Any answer outside 2xx is an error: redirects are never
   followed, also by an `http=` client built with `follow_redirects=True` (a write would be
   replayed as a `GET`, or its body sent to another address), and are raised naming where they
-  pointed; the same holds for the token endpoint. Batched writes report `batch_offset` and the
-  `completed` results of the chunks saved before a failure.
+  pointed; the same holds for the token endpoint. A `202 Accepted` whose body is not JSON is a
+  success, as in the official PHP SDK. Batched writes report `batch_offset` and the `completed`
+  results of the chunks saved before a failure.
 - Lists: `iterate()` async iterators that follow `_links.next` (only when it names the next
   page number, so a stuck link can neither loop nor skip pages) and stop on 204, on an empty
   page or without a next link (a short page that links a next one is followed), and
@@ -65,7 +66,8 @@ All notable changes to this project are documented here. The format follows
 - Request and answer shapes cross-checked against the official amoCRM PHP SDK
   ([amocrm/amocrm-api-php](https://github.com/amocrm/amocrm-api-php) at `a0072fe`). The READMEs
   list what it confirms with links to its code, what it made me fix (the changes to
-  `notes.get`, `iterate()`, redirects, error hints, `/leads/complex`, `Lead.price`, the tasks
-  filter and `AccountMovedError` above), and what still rests on the documentation alone.
+  `notes.get`, `iterate()`, redirects, error hints, `202 Accepted` answers, `/leads/complex`,
+  `Lead.price`, the tasks filter and `AccountMovedError` above), and what still rests on the
+  documentation alone.
 
 [0.1.0]: https://github.com/sinnercode228/aioamocrm/releases/tag/v0.1.0

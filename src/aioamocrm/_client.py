@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 _SUBDOMAIN = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
 _TOO_MANY_REQUESTS = 429
 _UNAUTHORIZED = 401
+_ACCEPTED = 202
 _SUCCESS_FIRST = 200
 _SUCCESS_END = 300
 
@@ -195,7 +196,7 @@ class AmoCRMClient:
 
         Returns:
             The decoded JSON, or ``None`` for an empty answer (amoCRM answers ``204 No Content``
-            for a list with nothing in it).
+            for a list with nothing in it) and for a ``202 Accepted`` whose body is not JSON.
 
         Raises:
             AmoCRMError: A subclass matching the failure; see :mod:`aioamocrm`.
@@ -207,6 +208,10 @@ class AmoCRMClient:
         try:
             return response.json()
         except ValueError:
+            if response.status_code == _ACCEPTED:
+                # Taken for later processing. The official PHP SDK treats a 202 as a success
+                # whatever its body; raising would report a failure for a request amoCRM took.
+                return None
             where = f"{method.upper()} {response.request.url.path}"
             msg = f"{where} answered with a body that is not valid JSON"
             raise AmoCRMError(msg, status_code=response.status_code) from None

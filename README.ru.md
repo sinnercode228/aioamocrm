@@ -338,7 +338,8 @@ for contact in page:
 ### Эндпоинты без своего ресурса
 
 `amo.request()` отправляет любой запрос к API с той же авторизацией, интервалами, повторами и
-разбором ошибок и возвращает разобранный JSON или `None` для пустого ответа:
+разбором ошибок и возвращает разобранный JSON, а для пустого ответа и для ответа `202 Accepted`,
+тело которого не JSON, — `None`:
 
 <!-- sample: request -->
 ```python
@@ -966,6 +967,11 @@ OAuth2:
 - **`hint` из ошибки больше не теряется.** SDK показывает ошибки эндпоинта токенов в виде
   «title: detail (hint)» ([`AmoCRMException.php#L10-L29`](https://github.com/amocrm/amocrm-oauth-client/blob/6041dc7/src/AmoCRMException.php#L10-L29)). Клиент отбрасывал `hint`,
   если был `detail`, и «Token has been revoked» до логов не доходил.
+- **Ответ 202 — успех, что бы ни пришло в теле.** SDK считает тело не в JSON ошибкой при
+  любом коде, кроме `202 Accepted` ([`AmoCRMApiRequest.php#L42-L47`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Client/AmoCRMApiRequest.php#L42-L47),
+  [`AmoCRMApiRequest.php#L649-L653`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Client/AmoCRMApiRequest.php#L649-L653)). `amo.request()` на ответ 202 с телом не в
+  JSON выбрасывал `AmoCRMError`, то есть сообщал о сбое запроса, который amoCRM приняла; теперь
+  он возвращает `None`.
 - **Один контакт и одна компания на сделку в `/leads/complex`.** SDK отправляет по одному
   контакту и одной компании и читает в ответе один `contact_id` и один `company_id`
   ([`LeadModel.php#L1036-L1043`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/LeadModel.php#L1036-L1043), [`Leads.php#L207-L219`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/Leads.php#L207-L219)). Второй контакт или вторая компания теперь дают

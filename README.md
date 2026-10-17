@@ -332,7 +332,8 @@ iterates its items, and `len(page)` counts them. A 204 gives an empty page.
 ### Endpoints without a resource
 
 `amo.request()` sends any API request with the same authorization, spacing, retries and error
-mapping, and returns the decoded JSON, or `None` for an empty answer:
+mapping, and returns the decoded JSON, or `None` for an empty answer and for a `202 Accepted`
+whose body is not JSON:
 
 <!-- sample: request -->
 ```python
@@ -957,6 +958,11 @@ Each change to the code came with a test that failed before it.
 - **The `hint` of an error is kept.** The SDK shows token errors as "title: detail (hint)"
   ([`AmoCRMException.php#L10-L29`](https://github.com/amocrm/amocrm-oauth-client/blob/6041dc7/src/AmoCRMException.php#L10-L29)). The client dropped the hint whenever there was a
   detail, so "Token has been revoked" never reached the logs.
+- **A 202 is a success whatever its body.** The SDK takes a body that is not JSON as an error
+  for every status but `202 Accepted` ([`AmoCRMApiRequest.php#L42-L47`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Client/AmoCRMApiRequest.php#L42-L47),
+  [`AmoCRMApiRequest.php#L649-L653`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Client/AmoCRMApiRequest.php#L649-L653)). `amo.request()` raised `AmoCRMError` for
+  a 202 whose body is not JSON, reporting a failure for a request amoCRM had taken; it now
+  returns `None`.
 - **One contact and one company per complex lead.** The SDK sends one of each to
   `/leads/complex` and reads one `contact_id` and one `company_id` back
   ([`LeadModel.php#L1036-L1043`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/LeadModel.php#L1036-L1043), [`Leads.php#L207-L219`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/Leads.php#L207-L219)). A second one now raises `ValueError` before

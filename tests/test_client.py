@@ -92,6 +92,26 @@ async def test_invalid_json_is_an_error(amo: AmoCRMClient, mock: respx.MockRoute
         await amo.request("GET", "account")
 
 
+async def test_an_accepted_answer_whose_body_is_not_json_is_a_success(
+    amo: AmoCRMClient, mock: respx.MockRouter
+) -> None:
+    # The official PHP SDK takes a body that is not JSON as an error for every status but 202,
+    # which is a success whatever its body. Raising would report a failure for a request amoCRM
+    # took.
+    route = mock.post("/api/v4/talks/42/close").mock(
+        return_value=httpx.Response(202, content=b"Accepted")
+    )
+    assert await amo.request("POST", "talks/42/close", json={"force_close": False}) is None
+    assert route.call_count == 1
+
+
+async def test_an_accepted_answer_with_json_is_decoded(
+    amo: AmoCRMClient, mock: respx.MockRouter
+) -> None:
+    mock.post("/api/v4/talks/42/close").mock(return_value=httpx.Response(202, json={"id": 42}))
+    assert await amo.request("POST", "talks/42/close") == {"id": 42}
+
+
 async def test_errors_are_raised_typed(amo: AmoCRMClient, mock: respx.MockRouter) -> None:
     mock.get("/api/v4/leads/1").mock(
         return_value=httpx.Response(404, json={"title": "Not Found", "status": 404})
