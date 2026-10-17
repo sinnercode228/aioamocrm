@@ -559,7 +559,8 @@ await amo.tasks.complete(7087, result="Договорились о встреч�
 типы создаются как `Note(entity_id=..., note_type="...", params={...})` с теми `params`, которые
 документация описывает для этого типа. `note.text` читает `params.text`.
 `iterate(entity_id=...)` перебирает примечания одной сущности, `iterate()` без него — примечания
-всех сущностей этого типа, `get(note_id)` возвращает одно примечание.
+всех сущностей этого типа, а `get(note_id, entity_id=...)` возвращает одно примечание. Оно
+запрашивается через свою сущность, поэтому нужны оба id.
 
 Задаче нужны `text` и `complete_till` (Unix-время). `tasks.update()` принимает задачи с их `id`,
 а `tasks.complete(task_id, result=...)` отправляет `PATCH /api/v4/tasks/{id}` с `is_completed` и

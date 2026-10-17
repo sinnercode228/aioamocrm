@@ -267,13 +267,21 @@ class NotesResource:
             limit=limit, filter=filter, order=order, params=params
         )
 
-    async def get(self, note_id: int) -> Note:
-        """Fetch one note by id.
+    async def get(self, note_id: int, *, entity_id: int) -> Note:
+        """Fetch one note of one entity (``GET /{entity_type}/{entity_id}/notes/{note_id}``).
+
+        A note is addressed through its entity: the official PHP SDK has no route that takes
+        the note id alone.
+
+        Example::
+
+            note = await amo.leads.notes.get(76787983, entity_id=19619)
 
         Raises:
             NotFoundError: There is no such note.
         """
-        path = f"{self.entity_type}/notes/{_id(note_id, 'note_id')}"
+        entity = _id(entity_id, "entity_id")
+        path = f"{self.entity_type}/{entity}/notes/{_id(note_id, 'note_id')}"
         return await _get_one(self._client, path, Note, [])
 
     async def create(

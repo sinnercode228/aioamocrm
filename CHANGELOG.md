@@ -39,9 +39,9 @@ All notable changes to this project are documented here. The format follows
   `get_page()`; `filter`, `order`, `with_`, `query` encoded in PHP bracket notation. An empty
   list (204 No Content) is an empty result.
 - Resources: leads, contacts and companies (get, create and update in batches, link, unlink,
-  links), `leads.create_complex` (`POST /leads/complex`), notes per entity type, tasks
-  (create, update, complete), pipelines and statuses, custom fields per entity type, users,
-  account.
+  links), `leads.create_complex` (`POST /leads/complex`), notes per entity type (one note is
+  fetched through its entity: `notes.get(note_id, entity_id=...)`), tasks (create, update,
+  complete), pipelines and statuses, custom fields per entity type, users, account.
 - Pydantic v2 models that keep unknown fields, with `field()`, `field_value()`,
   `field_values()` and `set_field()` for custom fields by id or code (`PHONE` / `EMAIL` with
   `enum_code`), and `to_api()` write bodies without the read-only parts.

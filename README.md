@@ -553,8 +553,9 @@ Notes belong to an entity type: `amo.leads.notes`, `amo.contacts.notes`, `amo.co
 `Note.common(entity_id, text)` is a plain text note; other types are
 `Note(entity_id=..., note_type="...", params={...})` with the `params` the documentation gives
 for that type. `note.text` reads `params.text`. `iterate(entity_id=...)` lists one entity's
-notes, `iterate()` without it the notes of every entity of that type, and `get(note_id)` one
-note.
+notes, `iterate()` without it the notes of every entity of that type, and
+`get(note_id, entity_id=...)` one note: it is fetched through its entity, so both ids are
+needed.
 
 A task needs `text` and `complete_till` (Unix time). `tasks.update()` takes tasks with their
 `id`, and `tasks.complete(task_id, result=...)` sends `PATCH /api/v4/tasks/{id}` with

@@ -436,12 +436,22 @@ async def test_list_notes_of_one_entity_and_of_all(
     assert every.calls.last.request.url.params["filter[note_type][0]"] == "common"
 
 
-async def test_get_one_note(amo: AmoCRMClient, mock: respx.MockRouter) -> None:
-    mock.get("/api/v4/leads/notes/76787983").mock(
+async def test_get_one_note_names_its_entity(amo: AmoCRMClient, mock: respx.MockRouter) -> None:
+    # The official PHP SDK fetches one note at /{entity_type}/{entity_id}/notes/{id}: it has no
+    # route that takes the note id alone.
+    route = mock.get("/api/v4/leads/167353/notes/76787983").mock(
         return_value=httpx.Response(200, json=payloads.note())
     )
-    note = await amo.leads.notes.get(76787983)
-    assert note.note_type == "common"
+    note = await amo.leads.notes.get(76787983, entity_id=167353)
+    assert (note.id, note.entity_id, note.note_type) == (76787983, 167353, "common")
+    assert route.called
+
+
+async def test_get_one_note_checks_both_ids(amo: AmoCRMClient) -> None:
+    with pytest.raises(TypeError, match="entity_id must be an int"):
+        await amo.leads.notes.get(76787983, entity_id="167353")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="note_id must be an int"):
+        await amo.leads.notes.get("76787983", entity_id=167353)  # type: ignore[arg-type]
 
 
 # ---- tasks ----------------------------------------------------------------------------------
