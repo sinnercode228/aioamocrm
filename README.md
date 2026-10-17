@@ -187,15 +187,17 @@ What happens to the tokens after that:
   integration that makes no request for longer has to be authorized by the account owner
   again.
 - **An account that moved.** When the owner changes the account's subdomain, or the account
-  moves to another domain, the token endpoint at the old address refuses the refresh with 401
-  or 404. The official PHP SDK then reads `api_domain` from the access token (a JWT; tokens
-  issued since 21.08.2024 carry it) and asks
+  moves to another domain, the official PHP SDK expects the token endpoint at the old address to
+  refuse the refresh with 401 or 404. It then reads `api_domain` from the access token (a JWT;
+  tokens issued since 21.08.2024 carry it), asks
   `GET https://{api_domain}/oauth2/account/current/subdomain` with the refresh token in the
-  `X-Refresh-Token` header. `OAuth2` asks the same and raises `AccountMovedError`, an
-  `AuthError` whose `domain` is the new host, such as `newname.amocrm.ru`. The refresh token
-  is not spent by then: split the host like the `referer` below, create the client for it with
-  the same `OAuth2` and storage, and keep the host next to the tokens. Without `api_domain`, or
-  when the answer names the same host, the refusal is a plain `AuthError`.
+  `X-Refresh-Token` header, and refreshes at the new host with the same refresh token, so it
+  counts on the refusal not having spent it. `OAuth2` asks the same and raises
+  `AccountMovedError`, an `AuthError` whose `domain` is the new host, such as
+  `newname.amocrm.ru`; the stored tokens stay as they were. Split the host like the `referer`
+  below, create the client for it with the same `OAuth2` and storage, and keep the host next to
+  the tokens. Without `api_domain`, or when the answer names the same host, the refusal is a
+  plain `AuthError`.
 
 The `referer` parameter of the redirect comes from a URL anyone can forge. Split it into
 subdomain and domain (`subdomain, _, domain = referer.partition(".")`) and pass both to
