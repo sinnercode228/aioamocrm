@@ -104,7 +104,7 @@ async def test_errors_are_raised_typed(amo: AmoCRMClient, mock: respx.MockRouter
 async def test_a_redirect_is_an_error_not_an_empty_list(
     amo: AmoCRMClient, mock: respx.MockRouter, status: int
 ) -> None:
-    # An account moved to another domain, or http:// instead of https://. The body is empty,
+    # A wrong subdomain or domain, or http:// instead of https://. The body is empty,
     # which must not read as "204, nothing there".
     moved = {"Location": "https://example.kommo.com/api/v4/leads?page=1&limit=250"}
     mock.get("/api/v4/leads").mock(return_value=httpx.Response(status, headers=moved))

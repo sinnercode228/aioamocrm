@@ -805,8 +805,11 @@ Redirects are never followed, also when you pass an `http=` client built with
 `follow_redirects=True`: a 301, 302 or 303 would replay a write as a `GET` without its body,
 and a 307 or 308 would send the body (to the token endpoint, that is the client secret and the
 refresh token) wherever it points. A 3xx is raised as `AmoCRMError` naming where it pointed
-(without the query), which usually means a wrong subdomain or domain, or an account that
-moved.
+(without the query), which usually means a wrong subdomain, domain or `base_url`. A redirect is
+not how the official PHP SDK expects a moved account to show up: it watches for a refresh
+refused with 401 or 404, and so does this client, which then raises `AccountMovedError` (see
+[OAuth2](#oauth2-tokens-storage-and-refresh)). With a long-lived token there is no refresh to
+watch, so the client cannot tell a moved account from a revoked token.
 
 Wrong arguments fail before any request: `ValueError` for a `limit` outside 1 to 250, a blank
 token or an absolute URL outside the account, `TypeError` for an id that is not an `int`.

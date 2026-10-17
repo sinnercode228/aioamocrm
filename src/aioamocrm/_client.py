@@ -332,9 +332,9 @@ class AmoCRMClient:
                     await _sleep(wait)
                     attempt += 1
                     continue
-            # Anything but 2xx is an error. A redirect (an account moved to another domain,
-            # http:// instead of https://) usually has an empty body that would otherwise
-            # read as "204, nothing there".
+            # Anything but 2xx is an error. A redirect (a wrong subdomain or domain, http://
+            # instead of https://) usually has an empty body that would otherwise read as
+            # "204, nothing there".
             if not _SUCCESS_FIRST <= status < _SUCCESS_END:
                 raise error_from_response(response)
             return response
