@@ -930,7 +930,8 @@ Data:
 
 ### What the cross-check made me fix
 
-Each change to the code came with a test that failed before it.
+Each change in behaviour came with a test that failed before it; the task names changed in
+wording only.
 
 - **One note is fetched through its entity.** `notes.get(note_id)` asked for
   `/{entity_type}/notes/{id}`, a route the SDK never uses. It fetches a note at
