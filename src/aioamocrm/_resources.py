@@ -493,7 +493,9 @@ class LeadsResource(EntityResource[Lead]):
     ) -> list[ComplexLeadResult]:
         """Create leads together with their contact and company (``POST /leads/complex``).
 
-        Put the new contact and company in ``embedded``::
+        Put the new contact and company in ``embedded``, at most one of each per lead: the
+        answer has one ``contact_id`` and one ``company_id`` per lead, and the official PHP SDK
+        sends one of each::
 
             lead = Lead(name="Website form", embedded=Embedded(contacts=[contact]))
             [result] = await amo.leads.create_complex([lead])
@@ -505,9 +507,25 @@ class LeadsResource(EntityResource[Lead]):
         Returns:
             One result per lead with ``id``, ``contact_id``, ``company_id`` and ``merged``
             (whether amoCRM merged the contact into an existing duplicate).
+
+        Raises:
+            ValueError: A lead embeds more than one contact or more than one company; nothing
+                is sent.
         """
         _check_batch_size(batch_size)
         bodies = [_body(lead) for lead in leads]
+        for index, data in enumerate(bodies):
+            embedded = data.get("_embedded")
+            if not isinstance(embedded, Mapping):
+                continue
+            for key in ("contacts", "companies"):
+                items = embedded.get(key)
+                if isinstance(items, list) and len(items) > 1:
+                    msg = (
+                        f"lead {index}: /leads/complex takes one contact and one company per "
+                        f"lead, not {len(items)} {key}"
+                    )
+                    raise ValueError(msg)
         return await _write_batches(
             self._client,
             "POST",

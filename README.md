@@ -339,7 +339,7 @@ above, `json=` is the body, and `retry=` works as described in
 ## Creating leads with contacts and companies
 
 `POST /api/v4/leads/complex` creates a lead together with a new contact and a new company in
-one request. Put them in `embedded`:
+one request. Put them in `embedded`, one contact and one company per lead at most:
 
 <!-- sample: complex -->
 ```python
@@ -366,7 +366,9 @@ print(result.id, result.contact_id, result.company_id, result.merged)
 The body sent is the lead's `to_api()`: only the fields you set, with `_embedded` holding the
 contact, the company and the tag. Each `ComplexLeadResult` has `id`, `contact_id`, `company_id`,
 `request_id` and `merged`, which tells whether amoCRM merged the contact into an existing one
-found by its duplicate control. The documentation allows at most 50 leads per request, which
+found by its duplicate control. The answer has room for one contact and one company per lead,
+so a lead that embeds two of either raises `ValueError` before anything is sent; link more
+contacts with `link()` afterwards. The documentation allows at most 50 leads per request, which
 is the default `batch_size`: a list of 120 leads goes out as 50, 50 and 20.
 
 To link entities that already exist, such as an existing contact to a lead, use `link()`:

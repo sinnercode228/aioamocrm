@@ -324,8 +324,8 @@ class Embedded(AmoModel):
     """``_embedded`` of a lead, contact or company.
 
     Fetched entities embed references (``id`` and ``_links``; ``with=contacts`` on leads adds
-    ``is_main``). For ``POST /api/v4/leads/complex`` the embedded contacts and companies are
-    full entities to create.
+    ``is_main``). For ``POST /api/v4/leads/complex`` the embedded contact and company are full
+    entities to create, one of each per lead at most.
     """
 
     tags: list[Tag] = Field(default_factory=list)

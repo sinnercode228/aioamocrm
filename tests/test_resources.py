@@ -340,6 +340,33 @@ async def test_complex_leads_are_batched(amo: AmoCRMClient, mock: respx.MockRout
     assert len(results) == 60
 
 
+@pytest.mark.parametrize(
+    "embedded",
+    [
+        Embedded(contacts=[Contact(name="Ivan"), Contact(name="Maria")]),
+        Embedded(companies=[Company(name="Romashka"), Company(name="Vasilek")]),
+        {"contacts": [{"name": "Ivan"}, {"id": 15009433}]},
+    ],
+)
+async def test_a_complex_lead_takes_one_contact_and_one_company(
+    amo: AmoCRMClient, mock: respx.MockRouter, embedded: Embedded | dict[str, Any]
+) -> None:
+    # The answer has room for one contact_id and one company_id per lead, and the official PHP
+    # SDK sends one of each; a second one would be created, or dropped, without the caller
+    # ever learning its id.
+    route = mock.post("/api/v4/leads/complex")
+    first = Lead(name="Website order")
+    second = (
+        Lead(name="Second order", embedded=embedded)
+        if isinstance(embedded, Embedded)
+        else {"name": "Second order", "_embedded": embedded}
+    )
+
+    with pytest.raises(ValueError, match=r"lead 1: .* one contact and one company per lead"):
+        await amo.leads.create_complex([first, second])
+    assert not route.called
+
+
 async def test_numeric_request_ids_do_not_break_the_answer_of_a_saved_write(
     amo: AmoCRMClient, mock: respx.MockRouter
 ) -> None:
