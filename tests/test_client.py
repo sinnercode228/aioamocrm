@@ -164,6 +164,25 @@ async def test_a_redirect_is_raised_even_with_a_client_that_follows_redirects(
     assert not get.called
 
 
+async def test_a_permanent_redirect_of_a_patch_does_not_resend_its_body(
+    mock: respx.MockRouter,
+) -> None:
+    # Unlike a POST, a PATCH keeps its method and body through a 301 in httpx.
+    moved = {"Location": "https://elsewhere.example.com/leads"}
+    patch = mock.patch("/api/v4/leads").mock(return_value=httpx.Response(301, headers=moved))
+    elsewhere = mock.patch("https://elsewhere.example.com/leads")
+    async with httpx.AsyncClient(follow_redirects=True) as http:
+        amo = AmoCRMClient(
+            subdomain="example", auth=LongLivedToken(TOKEN), http=http, rate_limit=None
+        )
+        with pytest.raises(AmoCRMError) as caught:
+            await amo.request("PATCH", "leads", json=[{"id": 1, "price": 5000}])
+
+    assert caught.value.status_code == 301
+    assert patch.call_count == 1
+    assert not elsewhere.called
+
+
 async def test_a_redirect_without_a_location_is_still_an_error(
     amo: AmoCRMClient, mock: respx.MockRouter
 ) -> None:

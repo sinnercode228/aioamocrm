@@ -804,12 +804,13 @@ A `ValidationIssue` has `request_id`, `code`, `path` (such as `custom_fields_val
 and `detail`.
 
 Redirects are never followed, also when you pass an `http=` client built with
-`follow_redirects=True`: a 301, 302 or 303 would replay a write as a `GET` without its body,
-and a 307 or 308 would send the body (to the token endpoint, that is the client secret and the
-refresh token) wherever it points. A 3xx is raised as `AmoCRMError` naming where it pointed
-(without the query), which usually means a wrong subdomain, domain or `base_url`. A redirect is
-not how the official PHP SDK expects a moved account to show up: it watches for a refresh
-refused with 401 or 404, and so does this client, which then raises `AccountMovedError` (see
+`follow_redirects=True`. httpx would replay a write where the redirect points: as a `GET`
+without its body after a 302 or 303 (or a 301 to a `POST`), and with its body after a 307 or 308
+(or a 301 to a `PATCH`); to the token endpoint, that body is the client secret and the refresh
+token. A 3xx is raised as `AmoCRMError` naming where it pointed (without the query), which
+usually means a wrong subdomain, domain or `base_url`. A redirect is not how the official PHP
+SDK expects a moved account to show up: it watches for a refresh refused with 401 or 404, and so
+does this client, which then raises `AccountMovedError` (see
 [OAuth2](#oauth2-tokens-storage-and-refresh)). With a long-lived token there is no refresh to
 watch, so the client cannot tell a moved account from a revoked token.
 
@@ -949,12 +950,12 @@ Each change to the code came with a test that failed before it.
   [`get_account_subdomain.php#L11-L24`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/examples/get_account_subdomain.php#L11-L24)). The client now asks the same and raises
   `AccountMovedError` with the new host. I had listed a 3xx as the way a move shows up; that
   was a guess, and the SDK has no code for it.
-- **Redirects, for the right reason.** I wrote that redirects are not followed because the
-  token would go with them, but httpx drops the token on a redirect to another host anyway.
-  The real reasons are that a 301, 302 or 303 replays a write as a `GET` without its body, and
-  a 307 or 308 sends the body wherever it points, client secret and refresh token included for
-  the token endpoint. A client passed as `http=` with `follow_redirects=True` did follow them;
-  now neither API nor token requests ever do.
+- **Redirects, for the right reason.** I wrote that redirects are not followed because the token
+  would go with them, but httpx drops the token on a redirect to another host anyway. The real
+  reasons are that a 302 or 303 (or a 301 to a `POST`) replays a write as a `GET` without its
+  body, and a 307 or 308 (or a 301 to a `PATCH`) sends the body wherever it points, client
+  secret and refresh token included for the token endpoint. A client passed as `http=` with
+  `follow_redirects=True` did follow them; now neither API nor token requests ever do.
 - **The `hint` of an error is kept.** The SDK shows token errors as "title: detail (hint)"
   ([`AmoCRMException.php#L10-L29`](https://github.com/amocrm/amocrm-oauth-client/blob/6041dc7/src/AmoCRMException.php#L10-L29)). The client dropped the hint whenever there was a
   detail, so "Token has been revoked" never reached the logs.

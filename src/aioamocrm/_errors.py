@@ -268,10 +268,11 @@ def error_from_response(response: httpx.Response) -> AmoCRMError:
     """Build the typed exception for an error answer.
 
     A 3xx is an error too, raised as :class:`AmoCRMError` naming where it pointed, without the
-    query. The client never follows redirects: a 301, 302 or 303 would replay a write as a
-    ``GET`` without its body, and a 307 or 308 would send the body (for the token endpoint, the
-    client secret and the refresh token) wherever it points. The token is not the reason:
-    httpx drops it on a redirect to another host.
+    query. The client never follows redirects: httpx would replay a write where the redirect
+    points, as a ``GET`` without its body after a 302 or 303 (or a 301 to a ``POST``), and with
+    its body after a 307 or 308 (or a 301 to a ``PATCH``); for the token endpoint the body holds
+    the client secret and the refresh token. The token is not the reason: httpx drops it on a
+    redirect to another host.
 
     Args:
         response: An answer with a 3xx, 4xx or 5xx status; its request must be set.

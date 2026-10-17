@@ -278,8 +278,9 @@ class AmoCRMClient:
             token = await self.auth.get_token(self._endpoint)
             try:
                 # Never followed, also with an http= client built with follow_redirects=True:
-                # a 301, 302 or 303 would replay a write as a GET without its body, and a 307
-                # or 308 would send the body wherever the Location points.
+                # httpx would replay a write at the Location, as a GET without its body after a
+                # 302 or 303 (or a 301 to a POST), and with its body after a 307 or 308 (or a
+                # 301 to a PATCH).
                 response = await self.http.request(
                     method,
                     target,
