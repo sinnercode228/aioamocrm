@@ -53,14 +53,45 @@ async def test_iterate_walks_three_pages_by_following_next(
         assert params.get_list("filter[id][4]") == ["5"]
 
 
-async def test_a_short_page_ends_the_walk_even_with_a_next_link(
+async def test_a_short_page_with_a_next_link_is_followed(
     amo: AmoCRMClient, mock: respx.MockRouter
 ) -> None:
+    # The next link is what says another page exists, as in the official PHP SDK; the size of
+    # the page does not.
     route = mock.get("/api/v4/leads").mock(
-        side_effect=[leads_page([1, 2, 3], 1, limit=5, has_next=True)]
+        side_effect=[
+            leads_page([1, 2, 3], 1, limit=5, has_next=True),
+            leads_page([4], 2, limit=5, has_next=False),
+        ]
     )
-    assert [lead.id async for lead in amo.leads.iterate(limit=5)] == [1, 2, 3]
-    assert route.call_count == 1
+    assert [lead.id async for lead in amo.leads.iterate(limit=5)] == [1, 2, 3, 4]
+    assert route.call_count == 2
+
+
+async def test_an_endpoint_that_serves_smaller_pages_is_walked_to_the_end(
+    amo: AmoCRMClient, mock: respx.MockRouter
+) -> None:
+    # iterate() asks for 250 per page; an endpoint that serves at most 50 still links the next.
+    def capped(request: httpx.Request) -> httpx.Response:
+        number = int(request.url.params["page"])
+        ids = range((number - 1) * 50 + 1, min(number * 50, 120) + 1)
+        body = payloads.page(
+            "custom_fields",
+            [payloads.custom_field(i) for i in ids],
+            number=number,
+            path="leads/custom_fields",
+            limit=50,
+            has_next=number < 3,
+        )
+        return httpx.Response(200, json=body)
+
+    route = mock.get("/api/v4/leads/custom_fields").mock(side_effect=capped)
+
+    fields = [field.id async for field in amo.leads.custom_fields.iterate()]
+
+    assert fields == list(range(1, 121))
+    assert route.call_count == 3
+    assert route.calls[0].request.url.params["limit"] == "250"
 
 
 async def test_a_full_page_without_next_ends_the_walk(
@@ -152,6 +183,20 @@ async def test_a_page_without_embedded_items_is_empty(
     assert [lead async for lead in amo.leads.iterate()] == []
 
 
+async def test_an_empty_page_with_a_next_link_ends_the_walk(
+    amo: AmoCRMClient, mock: respx.MockRouter
+) -> None:
+    route = mock.get("/api/v4/leads").mock(
+        side_effect=[
+            leads_page([1, 2], 1, limit=2, has_next=True),
+            leads_page([], 2, limit=2, has_next=True),
+            leads_page([3], 3, limit=2, has_next=False),
+        ]
+    )
+    assert [lead.id async for lead in amo.leads.iterate(limit=2)] == [1, 2]
+    assert route.call_count == 2
+
+
 async def test_parameters_missing_from_the_next_link_are_kept(
     amo: AmoCRMClient, mock: respx.MockRouter
 ) -> None:
@@ -205,8 +250,9 @@ async def test_a_next_link_without_limit_keeps_the_page_size(
     ids = [lead.id async for lead in amo.leads.iterate(limit=3)]
 
     assert ids == [1, 2, 3, 4, 5, 6, 7]
-    assert [call.request.url.params["page"] for call in route.calls] == ["1", "2", "3"]
-    assert [call.request.url.params["limit"] for call in route.calls] == ["3", "3", "3"]
+    # Page 3 is short but still links page 4, which answers 204.
+    assert [call.request.url.params["page"] for call in route.calls] == ["1", "2", "3", "4"]
+    assert [call.request.url.params["limit"] for call in route.calls] == ["3"] * 4
 
 
 @pytest.mark.parametrize("stuck_on", [1, 2])
@@ -222,4 +268,5 @@ async def test_a_next_link_that_does_not_move_forward_is_not_followed(
     ids = [lead.id async for lead in amo.leads.iterate(limit=3)]
 
     assert ids == list(range(1, 11))
-    assert [call.request.url.params["page"] for call in route.calls] == ["1", "2", "3", "4"]
+    pages = [call.request.url.params["page"] for call in route.calls]
+    assert pages == ["1", "2", "3", "4", "5"]

@@ -114,7 +114,9 @@ async def iterate_pages(
     the last one, so the walk never goes back or stands still. It follows ``_links.next`` when
     that link points into the account's API and names exactly that page; otherwise it asks for
     the page number itself, with the same parameters. It stops at the first page that is empty
-    (204), shorter than ``limit``, or has no ``next`` link.
+    (204, or no items) or has no ``next`` link. A page shorter than ``limit`` does not end the
+    walk: as in the official PHP SDK, the ``next`` link alone says whether there is more, so an
+    endpoint that serves smaller pages than asked for is still read to the end.
     """
     number = 1
     url = path
@@ -124,14 +126,13 @@ async def iterate_pages(
         page = parse_page(data, key, model, number)
         for item in page.items:
             yield item
-        if page.next_url is None or len(page.items) < limit:
+        if page.next_url is None or not page.items:
             return
         number += 1
         link = httpx.URL(page.next_url) if client.owns_url(page.next_url) else None
         if link is not None and link.params.get_list("page") == [str(number)]:
             # Follow the link, adding back any parameter it left out (such as with=). That
-            # includes limit: without it the server would use its default page size, the page
-            # would look short next to ours and the walk would end early.
+            # includes limit: without it the server would fall back to its default page size.
             present = {name for name, _ in link.params.multi_items()}
             url = page.next_url
             params = [

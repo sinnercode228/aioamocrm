@@ -34,9 +34,10 @@ All notable changes to this project are documented here. The format follows
   endpoint. Batched writes report `batch_offset` and the `completed` results of the chunks
   saved before a failure.
 - Lists: `iterate()` async iterators that follow `_links.next` (only when it names the next
-  page number, so a stuck link can neither loop nor skip pages) and stop on 204, on a short
-  page or without a next link, and `get_page()`; `filter`, `order`, `with_`, `query` encoded in
-  PHP bracket notation. An empty list (204 No Content) is an empty result.
+  page number, so a stuck link can neither loop nor skip pages) and stop on 204, on an empty
+  page or without a next link (a short page that links a next one is followed), and
+  `get_page()`; `filter`, `order`, `with_`, `query` encoded in PHP bracket notation. An empty
+  list (204 No Content) is an empty result.
 - Resources: leads, contacts and companies (get, create and update in batches, link, unlink,
   links), `leads.create_complex` (`POST /leads/complex`), notes per entity type, tasks
   (create, update, complete), pipelines and statuses, custom fields per entity type, users,

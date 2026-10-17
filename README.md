@@ -111,8 +111,8 @@ What it sends:
 2. `POST /api/v4/leads` with `[{"name": "Website order", "price": 5000}]`. The answer gives one
    `EntityRef` per lead, with its new `id`.
 3. `GET /api/v4/leads?page=1&limit=250&filter[updated_at][from]=...`, then the next pages
-   while the loop asks for more items. The walk ends at a page shorter than 250 items, an empty
-   answer (204) or a page without a `next` link.
+   while the loop asks for more items. The walk ends at a page without a `next` link or an
+   empty answer (204).
 
 The requests go out at most 7 per second. For a Kommo account pass `domain="kommo.com"`, for an
 international amoCRM account `domain="amocrm.com"`; `base_url=` takes any other address, such
@@ -301,8 +301,10 @@ How `iterate()` walks:
 
 1. It requests `page=1&limit=250` and your parameters, and yields the items one by one. The
    next page is requested only when the loop asks for the item after the last one.
-2. It stops at a 204 (amoCRM's answer for an empty list), at a page with fewer than `limit`
-   items, or at a page without `_links.next`.
+2. It stops at a 204 (amoCRM's answer for an empty list), at a page with no items, or at a
+   page without `_links.next`. A page with fewer than `limit` items that still links a next
+   one does not end the walk, so an endpoint that serves smaller pages than you asked for is
+   read to the end.
 3. It follows `_links.next.href` only when the link points into this account's `/api/v4/` and
    names the page after the current one, adding back any of your parameters the link left out
    (`with`, `limit`). Otherwise it asks for that page number itself, with the same parameters.
