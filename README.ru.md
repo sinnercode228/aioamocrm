@@ -15,9 +15,11 @@
 Библиотека выросла из коннектора amoCRM в [Relay](https://github.com/sinnercode228/integration-hub):
 там она создаёт сделки с контактами и примечаниями и принимает вебхуки аккаунта.
 
-Версия 0.1.0 пока не опубликована на PyPI. Тесты работают только с замоканным HTTP, ответы в них
-написаны по документации amoCRM: живого аккаунта за ними не было. Что именно из этого следует,
-перечислено в разделе [Проверено только по документации](#проверено-только-по-документации).
+Версия 0.1.0 пока не опубликована на PyPI, и живого аккаунта amoCRM за её тестами по-прежнему
+нет: они работают с замоканным HTTP. Форматы запросов и ответов я писал по документации amoCRM,
+а потом сверил с официальным PHP SDK от самой amoCRM. В разделе
+[Что и как проверено](#что-и-как-проверено) перечислено, что SDK подтвердил, что после сверки
+пришлось исправить и что по-прежнему держится только на документации.
 
 ## Зачем ещё один клиент
 
@@ -834,80 +836,209 @@ for lead_id in (1, 2):
 пишет каждый запрос в свой логгер `httpx` на уровне INFO, с полным адресом вместе со строкой
 запроса, но без заголовков.
 
-## Проверено только по документации
+## Что и как проверено
 
-За тестами нет аккаунта amoCRM. Все запросы и ответы замоканы через respx, а тела ответов
-написаны по [документации amoCRM API v4](https://www.amocrm.ru/developers/content/crm_platform/api-reference).
-Пока писалась эта версия, сайт документации был недоступен, поэтому форматы взяты из
-документации в том виде, в каком я её знал, и ни один ответ не записан с живого аккаунта. Вот
-что держится только на документации:
+Живого аккаунта amoCRM за тестами по-прежнему нет: все запросы и ответы замоканы через respx.
+Сначала я писал форматы по
+[документации amoCRM API v4](https://www.amocrm.ru/developers/content/crm_platform/api-reference)
+в том виде, в каком её помнил: пока я работал над этой версией, сайт документации был
+недоступен. Потом сверил всё с официальным PHP SDK, который поддерживает сама amoCRM:
+[amocrm/amocrm-api-php](https://github.com/amocrm/amocrm-api-php) на коммите
+[`a0072fe`](https://github.com/amocrm/amocrm-api-php/tree/a0072fe) от 1 июля 2026 года, вместе с
+его OAuth-провайдером [amocrm/amocrm-oauth-client](https://github.com/amocrm/amocrm-oauth-client)
+3.0.0. SDK — это клиент, а не сервер. По нему видно, как должен выглядеть запрос и какие поля
+ответа читают его авторы. Если же SDK о чём-то молчит, это ничего не доказывает ни в одну, ни в
+другую сторону.
 
-**Лимиты и транспорт**
+### Что подтверждает официальный SDK
 
-- 7 запросов в секунду на интеграцию и 50 на аккаунт; 429 при превышении, затем 403 и блокировка
-  IP за повторяющийся флуд. Отсюда значение `rate_limit=7` по умолчанию.
-- `Retry-After` в ответе 429: документация его не обещает. Если заголовок есть, клиент его
-  соблюдает.
-- Применил ли amoCRM запись, на которую ответил 429: документация молчит. Поэтому без
+Запросы и ошибки:
+
+- Адрес аккаунта `https://{subdomain}.{domain}`, API под `/api/v4/`, заголовок
+  `Authorization: Bearer <токен>` в каждом запросе; долгосрочный токен передаётся точно так же,
+  как access-токен: [`AmoCRMApiClient.php#L58`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Client/AmoCRMApiClient.php#L58), [`Leads.php#L45`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/Leads.php#L45),
+  [`AmoCRMApiRequest.php#L677-L683`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Client/AmoCRMApiRequest.php#L677-L683), [`LongLivedAccessToken.php#L20`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Client/LongLivedAccessToken.php#L20).
+- Тела запросов на запись — JSON: [`AmoCRMApiRequest.php#L216-L217`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Client/AmoCRMApiRequest.php#L216-L217).
+- Параметры запроса в скобочной нотации PHP: `filter[...]` с нумерованными списками,
+  `order[поле]=asc|desc`, `with` через запятую, `query` на верхнем уровне, `page` и `limit`,
+  булевы значения как `1` и `0`: [`LeadsFilter.php#L427-L492`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Filters/LeadsFilter.php#L427-L492),
+  [`OrderTrait.php#L36-L39`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Filters/Traits/OrderTrait.php#L36-L39), [`BaseEntity.php#L84-L87`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/BaseEntity.php#L84-L87),
+  [`PagesFilterTrait.php#L56-L67`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Filters/Traits/PagesFilterTrait.php#L56-L67), [`TasksFilter.php#L268-L270`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Filters/TasksFilter.php#L268-L270).
+- `204 No Content` на пустой список: [`AmoCRMApiRequest.php#L601-L607`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Client/AmoCRMApiRequest.php#L601-L607). В README SDK об этом сказано прямо:
+  «ничего страшного не произошло, просто нет данных на ваш запрос» ([`README.md#L622`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/README.md#L622)).
+- С OAuth2 после 401 — одно обновление токена и ещё одна попытка, с долгосрочным токеном — ни
+  одного: [`AmoCRMApiRequest.php#L240-L252`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Client/AmoCRMApiRequest.php#L240-L252), [`AmoCRMApiRequest.php#L159-L163`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Client/AmoCRMApiRequest.php#L159-L163).
+- Ответ 400 с `validation-errors` — ошибка валидации, в телах ошибок есть `detail`, а тело
+  ответа 429 может оказаться не JSON: [`AmoCRMApiRequest.php#L609-L631`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Client/AmoCRMApiRequest.php#L609-L631), [`AmoCRMApiRequest.php#L649-L666`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Client/AmoCRMApiRequest.php#L649-L666).
+- Пачки по 50: README SDK советует создавать и изменять за раз не больше 50 сущностей
+  ([`README.md#L196-L197`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/README.md#L196-L197)).
+
+OAuth2:
+
+- Эндпоинт токенов — `/oauth2/access_token` на хосте самого аккаунта, того, что пришёл в
+  `referer` редиректа: [`AmoCRM.php#L124-L143`](https://github.com/amocrm/amocrm-oauth-client/blob/6041dc7/src/AmoCRM.php#L124-L143), [`get_token.php#L7-L9`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/examples/get_token.php#L7-L9).
+- `POST` с `client_id`, `client_secret`, `redirect_uri`, `grant_type` и `code` или
+  `refresh_token`; из ответа читаются `access_token`, `refresh_token` и `expires_in`; новый
+  refresh-токен сохраняется после каждого обновления: [`AmoCRMOAuth.php#L143-L145`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/OAuth/AmoCRMOAuth.php#L143-L145),
+  [`AmoCRMOAuth.php#L170-L172`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/OAuth/AmoCRMOAuth.php#L170-L172), [`AmoCRMOAuth.php#L214-L218`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/OAuth/AmoCRMOAuth.php#L214-L218), [`get_token.php#L44-L52`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/examples/get_token.php#L44-L52).
+- Ошибки эндпоинта токенов — код 400 и выше и тело из `title`, `detail` и `hint`:
+  [`AmoCRM.php#L160-L165`](https://github.com/amocrm/amocrm-oauth-client/blob/6041dc7/src/AmoCRM.php#L160-L165), [`AmoCRMException.php#L10-L29`](https://github.com/amocrm/amocrm-oauth-client/blob/6041dc7/src/AmoCRMException.php#L10-L29).
+- Для Kommo и `amocrm.com` своего пути к токенам нет, отличается только скрипт кнопки
+  установки: [`AmoCRMOAuth.php#L369-L372`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/OAuth/AmoCRMOAuth.php#L369-L372).
+
+Списки:
+
+- Признак следующей страницы — только `_links.next.href`, и это абсолютная ссылка на адрес
+  самого аккаунта: [`BaseEntity.php#L107-L109`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/BaseEntity.php#L107-L109), [`PageMethodsTrait.php#L28-L42`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/Traits/PageMethodsTrait.php#L28-L42), [`AmoCRMApiRequest.php#L522-L527`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Client/AmoCRMApiRequest.php#L522-L527).
+- Фильтры из этого README: `filter[statuses][0][pipeline_id]` и `[status_id]`,
+  `filter[updated_at][from]`, у задач `is_completed`, `entity_type`, `entity_id`,
+  `responsible_user_id`, `id` и `updated_at`, у примечаний `note_type`, `id`, `updated_at` и
+  `entity_id`: [`LeadsFilter.php#L311-L326`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Filters/LeadsFilter.php#L311-L326),
+  [`BaseRangeFilter.php#L64-L70`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Filters/BaseRangeFilter.php#L64-L70), [`TasksFilter.php#L256-L299`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Filters/TasksFilter.php#L256-L299),
+  [`NotesFilter.php#L124-L142`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Filters/NotesFilter.php#L124-L142).
+- `with=contacts` и `with=loss_reason` у сделок; контакты приходят вложенными, вместе с
+  `is_main`: [`LeadModel.php#L1064-L1074`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/LeadModel.php#L1064-L1074), [`LeadModel.php#L838-L841`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/LeadModel.php#L838-L841), [`ContactModel.php#L561-L563`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/ContactModel.php#L561-L563).
+
+Запись:
+
+- `POST` и `PATCH /api/v4/{сущность}` с JSON-массивом; в ответе `_embedded.<сущность>`, у
+  каждого элемента `id`, `request_id` и `updated_at`, причём `request_id` возвращается таким,
+  каким его отправили: [`BaseEntity.php#L189-L228`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/BaseEntity.php#L189-L228), [`Leads.php#L108-L136`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/Leads.php#L108-L136),
+  [`BaseApiCollection.php#L325-L344`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Collections/BaseApiCollection.php#L325-L344).
+- `POST /api/v4/leads/complex` с контактом, компанией и тегами в `_embedded`; в ответе массив
+  из `id`, `contact_id`, `company_id`, `request_id` и `merged`: [`LeadModel.php#L1030-L1059`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/LeadModel.php#L1030-L1059),
+  [`Leads.php#L158-L225`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/Leads.php#L158-L225).
+- Значения дополнительных полей уходят как `field_id` или `field_code` со списком `values`, без
+  `field_name` и `field_type`:
+  [`BaseCustomFieldValuesModel.php#L149-L157`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/CustomFieldsValues/BaseCustomFieldValuesModel.php#L149-L157).
+  `PHONE` и `EMAIL` задаются по коду, с кодом значения вроде `WORK`:
+  [`contacts_actions.php#L88-L106`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/examples/contacts_actions.php#L88-L106), [`contacts_actions.php#L136-L152`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/examples/contacts_actions.php#L136-L152).
+  Поле-список можно заполнить текстом варианта: [`invoices_actions.php#L149`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/examples/invoices_actions.php#L149).
+- Связи: `POST /{сущность}/{id}/link` и `/unlink` с `to_entity_id`, `to_entity_type` и
+  `metadata`, на `unlink` приходит 204, `is_main` передаётся в `metadata`:
+  [`LinkMethodsTrait.php#L57-L144`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/Traits/LinkMethodsTrait.php#L57-L144),
+  [`ContactModel.php#L813-L826`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/ContactModel.php#L813-L826). Теги уходят как `{name}` или `{id}`:
+  [`TagModel.php#L161-L174`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/TagModel.php#L161-L174).
+- Задача закрывается через `PATCH /api/v4/tasks/{id}` с `is_completed` и `result.text`:
+  [`BaseEntity.php#L238-L254`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/BaseEntity.php#L238-L254), [`TaskModel.php#L557-L571`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/TaskModel.php#L557-L571).
+
+Данные:
+
+- Статус 142 — «Успешно реализовано», 143 — «Закрыто и не реализовано»: [`LeadModel.php#L39-L40`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/LeadModel.php#L39-L40). Тип
+  задачи 2 — встреча: [`TaskModel.php#L18-L22`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/TaskModel.php#L18-L22).
+- Примечания лежат в `/{тип_сущности}/notes` и `/{тип_сущности}/{id}/notes`, у примечания
+  `common` текст в `params.text`: [`EntityNotes.php#L46-L61`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/EntityNotes.php#L46-L61),
+  [`CommonNote.php#L16-L28`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/NoteType/CommonNote.php#L16-L28).
+- Воронки — `/api/v4/leads/pipelines`, без постраничной выборки; описания дополнительных полей —
+  `/{тип_сущности}/custom_fields`; подписки на вебхуки — `/api/v4/webhooks`:
+  [`Pipelines.php#L37`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/Leads/Pipelines.php#L37),
+  [`CustomFields.php#L42`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/CustomFields.php#L42),
+  [`Webhooks.php#L29`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/Webhooks.php#L29).
+
+### Что пришлось исправить после сверки
+
+Каждое изменение в коде пришло вместе с тестом, который до него падал.
+
+- **Одно примечание запрашивается через свою сущность.** `notes.get(note_id)` ходил в
+  `/{тип_сущности}/notes/{id}`, а SDK такой путь не использует вообще. Он берёт примечание
+  по адресу `/{тип_сущности}/{entity_id}/notes/{id}`, и в его примере прямо написано, что
+  нужны оба id ([`EntityNotes.php#L186-L198`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/EntityNotes.php#L186-L198),
+  [`notes_actions.php#L87-L95`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/examples/notes_actions.php#L87-L95)). Теперь метод вызывается как
+  `notes.get(note_id, entity_id=...)`.
+- **Короткая страница больше не обрывает обход.** `iterate()` останавливался на любой странице,
+  где элементов меньше `limit`, даже если amoCRM дал ссылку на следующую. SDK смотрит только на
+  ссылку `next` ([`PageMethodsTrait.php#L28-L42`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/Traits/PageMethodsTrait.php#L28-L42)), теперь и `iterate()` тоже. Если последняя страница вдруг
+  сошлётся на следующую, это будет стоить одного лишнего запроса.
+- **Переезд аккаунта выясняется запросом, а не угадывается по редиректу.** Когда обновление
+  токена отклонено с кодом 401 или 404, SDK берёт `api_domain` из access-токена, спрашивает
+  `GET https://{api_domain}/oauth2/account/current/subdomain` с refresh-токеном в заголовке
+  `X-Refresh-Token` и обновляет токены ещё раз, уже на полученном домене ([`AmoCRMOAuth.php#L173-L202`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/OAuth/AmoCRMOAuth.php#L173-L202),
+  [`AmoCRMOAuth.php#L507-L548`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/OAuth/AmoCRMOAuth.php#L507-L548), [`AmoCRMOAuth.php#L660-L698`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/OAuth/AmoCRMOAuth.php#L660-L698),
+  [`get_account_subdomain.php#L11-L24`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/examples/get_account_subdomain.php#L11-L24)). Клиент теперь делает тот же запрос и
+  выбрасывает `AccountMovedError` с новым хостом. Раньше я писал, что переезд проявится ответом
+  3xx; это была догадка, и в SDK для такого случая нет никакого кода.
+- **Редиректы — по правильной причине.** Я писал, что редиректы не выполняются, потому что с
+  ними ушёл бы токен. Но httpx и так убирает токен при редиректе на другой хост. Настоящие
+  причины другие: после 301, 302 или 303 запись повторилась бы как `GET` без тела, а после 307
+  или 308 тело ушло бы туда, куда ведёт редирект, у эндпоинта токенов вместе с секретным ключом
+  и refresh-токеном. Клиент из `http=` с `follow_redirects=True` редиректы всё-таки выполнял;
+  теперь их не выполняют ни запросы к API, ни запросы токенов.
+- **`hint` из ошибки больше не теряется.** SDK показывает ошибки эндпоинта токенов в виде
+  «title: detail (hint)» ([`AmoCRMException.php#L10-L29`](https://github.com/amocrm/amocrm-oauth-client/blob/6041dc7/src/AmoCRMException.php#L10-L29)). Клиент отбрасывал `hint`,
+  если был `detail`, и «Token has been revoked» до логов не доходил.
+- **Один контакт и одна компания на сделку в `/leads/complex`.** SDK отправляет по одному
+  контакту и одной компании и читает в ответе один `contact_id` и один `company_id`
+  ([`LeadModel.php#L1036-L1043`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/LeadModel.php#L1036-L1043), [`Leads.php#L207-L219`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/Leads.php#L207-L219)). Второй контакт или вторая компания теперь дают
+  `ValueError` ещё до отправки.
+- **Цены с копейками.** `Lead.price` был `int`. SDK отправляет цену как float и отмечает, что
+  дробные единицы валюты поддерживает Kommo ([`LeadModel.php#L261-L282`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/LeadModel.php#L261-L282), [`LeadModel.php#L945-L947`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/LeadModel.php#L945-L947)), поэтому
+  теперь тип `int | float`.
+- **Названия у задач.** Фильтр по типу задачи называется `task_type_id`; SDK пока отправляет
+  вместе с ним и старое `task_type`, но помечает его к удалению ([`TasksFilter.php#L272-L279`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Filters/TasksFilter.php#L272-L279)). Тип
+  задачи 1 в SDK теперь называется follow-up, а старое имя call («звонок») помечено как
+  устаревшее ([`TaskModel.php#L18-L22`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/TaskModel.php#L18-L22)).
+
+### Что по-прежнему держится только на документации
+
+Ничего из этого SDK не показывает, в основном потому, что это поведение сервера. Если amoCRM
+ведёт себя иначе, смотреть стоит сначала сюда.
+
+**Лимиты и ошибки**
+
+- 7 запросов в секунду на интеграцию и 50 на аккаунт; 429 при превышении, затем 403 и
+  блокировка IP за повторяющийся флуд. Лимитера в SDK нет, его README лишь напоминает о лимитах.
+  Значение `rate_limit=7` по умолчанию взято из документации.
+- `Retry-After` в ответе 429 (SDK его не читает) и то, применил ли amoCRM запись, на которую
+  ответил 429: SDK ничего не повторяет, поэтому об этом молчит. Отсюда правило: без
   `retry=True` записи после 429 не повторяются.
-- Ответ 3xx для переехавшего аккаунта (например, на `kommo.com`) — предположение; клиент
-  выбрасывает любой 3xx, который получил.
-- Аккаунты Kommo на `kommo.com` отдают тот же API v4.
-
-**Списки**
-
-- `204 No Content` для пустого списка и для сущности, запрошенной по несуществующему id (404
-  обрабатывается так же).
-- `page` и `limit` (не больше 250), `_page` и `_links.next.href` в ответах со списками.
-- Имена фильтров из этого README (`filter[statuses][0][pipeline_id]`,
-  `filter[updated_at][from]`, `filter[is_completed]`, `filter[entity_type]`,
-  `filter[entity_id]`) и то, что `with=contacts` добавляет id контактов с признаком `is_main`.
-
-**Запись**
-
-- Не больше 50 сделок на `POST /leads/complex`, до 250 элементов в остальных запросах записи.
-- Ответы на запись: `_embedded.<сущность>` с `id` и `request_id` для каждого элемента; у
-  `/leads/complex` — JSON-массив из `id`, `contact_id`, `company_id`, `request_id` (список) и
-  `merged`.
-- `request_id` возвращается без изменений (отправленное число возвращается числом), а если его не
-  задали, равен позиции элемента в запросе.
-- Тела ошибок: `title`, `type`, `status`, `detail`; при 400 — `validation-errors` с `request_id`
-  и `errors` из `code`, `path` и `detail` для каждого отклонённого элемента, причём отклоняется
-  весь запрос. 402 для неоплаченного аккаунта.
-- Связи: `POST /{сущность}/{id}/link` с `to_entity_id`, `to_entity_type` и `metadata`
-  (`is_main`, `catalog_id`, `quantity`), в ответе `_embedded.links`.
-- Выполнение задачи через `PATCH /tasks/{id}` с `is_completed` и `result.text`.
-- Поле-список принимает текст варианта в `value` или его `enum_id`.
+- `limit` не больше 250 на страницу, до 250 элементов в запросе на запись и жёсткий предел в 50
+  сделок на `/leads/complex`. SDK по умолчанию просит по 50 на страницу и лишь советует не
+  больше 50 в пачке.
+- 402 для неоплаченного аккаунта, 403 при нехватке прав или блокировке, 422 как ошибка
+  валидации и то, что при 400 отклоняется весь запрос, а не сохраняется его часть. Кроме 401,
+  204, ответа 400 с `validation-errors` и ответа 429 с телом не в JSON, на любой код ошибки SDK
+  выбрасывает одно и то же общее исключение.
+- Устройство `validation-errors` (`request_id`, внутри `errors` с `code`, `path` и `detail`),
+  поля `type` и `status` в теле ошибки и то, что без явного `request_id` он равен позиции
+  элемента в запросе. SDK всегда отправляет свой `request_id` и внутрь этого массива не
+  заглядывает.
+- `204 No Content` для сущности, запрошенной по несуществующему id, и `_page` в ответах со
+  списками.
+- Ответ 3xx от API при неверном поддомене или домене. Клиент выбрасывает любой 3xx, который
+  получил.
 
 **OAuth2**
 
-- Эндпоинт `/oauth2/access_token` на домене аккаунта, JSON-тела запросов к нему и поля ответа
-  `token_type`, `expires_in`, `access_token`, `refresh_token`.
-- Access-токен на 24 часа, одноразовый код авторизации на 20 минут, refresh-токен на 3 месяца и
-  смена refresh-токена при каждом обновлении.
-- Долгосрочный токен передаётся как bearer-токен, так же как access-токен.
+- JSON-тело запроса к `/oauth2/access_token`: SDK отправляет те же поля в form-urlencoded. Сюда
+  же `token_type` в ответе, этого поля SDK не читает.
+- Access-токен на 24 часа, одноразовый код на 20 минут, refresh-токен на 3 месяца и то, что
+  старый refresh-токен после обновления перестаёт работать. На последнем держится обработка
+  двух процессов, которые обновляют токены одновременно.
+- То, что аккаунты Kommo на `kommo.com` отдают тот же API v4, а аккаунты вообще живут только на
+  `amocrm.ru`, `amocrm.com` и `kommo.com`.
 
 **Данные**
 
 - Привычки `json_encode` из PHP: `[]` вместо пустого объекта, `"result": []` у задач без
   результата, числа в текстовых полях.
-- Статус 142 — «Успешно реализовано», 143 — «Закрыто и не реализовано» в любой воронке; тип
-  задачи 1 — «Связаться» (раньше «Звонок»), 2 — «Встреча»; коды полей `PHONE`, `EMAIL` и `POSITION` и коды значений вроде
-  `WORK` и `MOB`.
+- Код значения `MOB` и код поля `POSITION` (в примерах SDK есть `PHONE`, `EMAIL`, `WORK` и
+  `WORKDD`), а также то, что amoCRM принимает `color` в `_embedded.tags` сущности.
 
 **Вебхуки**
 
-- Формат тела, в том числе примечания в `leads[note][0][note][...]` и поля-даты в виде
-  `values][0]=` без `[value]`; все значения — строки.
-- Отсутствие у вебхуков аккаунта какой-либо подписи.
-- Повторная отправка и отключение адресов, которые постоянно отвечают ошибкой или медленно.
+- Всё о входящих вебхуках аккаунта: тело в формате form-urlencoded (`leads[status][0][...]`,
+  примечания в `leads[note][0][note][...]`, поля-даты в виде `values][0]=` без `[value]`), все
+  значения строками, отсутствие какой-либо подписи, повторная отправка на адреса, которые
+  отвечают ошибкой или медленно, и их отключение. Кода, который принимает вебхуки, в SDK нет:
+  он только управляет подписками.
 
 Что проверено здесь, без amoCRM: запросы, которые строит клиент (пути, кодирование параметров,
 тела), каждое решение о повторе из таблицы выше, интервалы на настоящих часах, постраничный
-обход со ссылками `next`, которые теряют параметры или стоят на месте, обновление токенов при
-упавшем сохранении и при двух процессах с общим хранилищем, разбор вебхуков из 10 000 полей, а
-также то, что ни access-токен, ни refresh-токен, ни секретный ключ, ни долгосрочный токен не
-появляются в логах на уровне DEBUG, в `repr()`, в сообщениях об ошибках и в трейсбеках.
+обход со ссылками `next`, которые теряют параметры, стоят на месте или ведут дальше короткой
+страницы, обновление токенов при упавшем сохранении, при двух процессах с общим хранилищем и
+при переехавшем аккаунте, разбор вебхуков из 10 000 полей, а также то, что ни access-токен, ни
+refresh-токен, ни секретный ключ, ни долгосрочный токен не появляются в логах на уровне DEBUG, в
+`repr()`, в сообщениях об ошибках и в трейсбеках.
 
 Если вы запустите библиотеку на живом аккаунте и какой-то ответ окажется другим, откройте,
 пожалуйста, issue с запросом и ответом, убрав из них токены.
@@ -1045,8 +1176,8 @@ pytest --cov
 Каждое изменение поведения приходит с тестом, который до него падал, а исправление ошибки
 начинается с теста, который её показывает. Код остаётся чистым для `mypy --strict`, у публичных
 объектов есть docstring, логирование идёт через `logging.getLogger(__name__)`, и токены не
-попадают в лог. Тестовые ответы следуют документации; ответ, записанный с настоящего аккаунта
-(без токенов), очень пригодится — укажите, откуда он.
+попадают в лог. Тестовые ответы следуют документации и официальному PHP SDK; ответ, записанный
+с настоящего аккаунта (без токенов), очень пригодится — укажите, откуда он.
 
 Примеры из README — это тесты: каждый блок Python после метки `<!-- sample: имя -->` выполняется
 в `tests/test_readme.py` против моков respx, и в README.md и README.ru.md должны быть одни и те

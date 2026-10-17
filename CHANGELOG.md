@@ -58,9 +58,14 @@ All notable changes to this project are documented here. The format follows
   and samples: quick start with a long-lived token, OAuth2 and token storage (an SQLite
   storage for many accounts), pagination and filters, leads with contacts and companies,
   custom fields, notes and tasks, webhooks with FastAPI, rate limiting and retries, errors,
-  what was checked against the documentation only, limits and roadmap, testing with respx,
-  and the release process. Every Python sample in both files runs in `tests/test_readme.py`
-  against respx mocks (`pycon` samples as doctests), so a sample that stops working fails the
-  build. The sdist includes `README.ru.md`.
+  what was checked and how, limits and roadmap, testing with respx, and the release process.
+  Every Python sample in both files runs in `tests/test_readme.py` against respx mocks
+  (`pycon` samples as doctests), so a sample that stops working fails the build. The sdist
+  includes `README.ru.md`.
+- Request and answer shapes cross-checked against the official amoCRM PHP SDK
+  ([amocrm/amocrm-api-php](https://github.com/amocrm/amocrm-api-php) at `a0072fe`). The READMEs
+  list what it confirms with links to its code, what it made me fix (the changes to
+  `notes.get`, `iterate()`, redirects, error hints, `/leads/complex`, `Lead.price`, the tasks
+  filter and `AccountMovedError` above), and what still rests on the documentation alone.
 
 [0.1.0]: https://github.com/sinnercode228/aioamocrm/releases/tag/v0.1.0

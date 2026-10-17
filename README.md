@@ -15,10 +15,11 @@ clean, ships `py.typed`.
 It grew out of the amoCRM connector in [Relay](https://github.com/sinnercode228/integration-hub),
 which creates leads with their contacts and notes and receives account webhooks.
 
-Version 0.1.0 is not on PyPI yet. The test suite runs against mocked HTTP only, with answers
-written from the amoCRM documentation; there was no amoCRM account behind it.
-[Checked against the documentation only](#checked-against-the-documentation-only) lists exactly
-what that covers.
+Version 0.1.0 is not on PyPI yet, and there is still no amoCRM account behind its tests: they
+run against mocked HTTP. I wrote the request and answer shapes from the amoCRM documentation and
+then cross-checked them against amoCRM's official PHP SDK.
+[What was checked and how](#what-was-checked-and-how) lists what the SDK confirms, what it made
+me fix, and what still rests on the documentation alone.
 
 ## Why another client
 
@@ -824,79 +825,207 @@ delay. Tokens, the client secret, query strings and bodies are never logged. htt
 request on its own `httpx` logger at INFO, with the full URL including the query string, but no
 headers.
 
-## Checked against the documentation only
+## What was checked and how
 
-There is no amoCRM account behind the test suite. Every request and answer is mocked with respx,
-with bodies written from the
-[amoCRM API v4 documentation](https://www.amocrm.ru/developers/content/crm_platform/api-reference).
-The documentation site was not reachable while this version was written, so the shapes come
-from the documentation as I knew it, and none of them was recorded from a live account. These
-are the behaviours that rest on it:
+There is still no amoCRM account behind the tests: every request and every answer is mocked with
+respx. I first wrote the shapes from the
+[amoCRM API v4 documentation](https://www.amocrm.ru/developers/content/crm_platform/api-reference)
+as I knew it, because the documentation site was not reachable while I worked on this version.
+Then I cross-checked them against the official PHP SDK that amoCRM maintains,
+[amocrm/amocrm-api-php](https://github.com/amocrm/amocrm-api-php) at commit
+[`a0072fe`](https://github.com/amocrm/amocrm-api-php/tree/a0072fe) (1 July 2026), and its OAuth
+provider package [amocrm/amocrm-oauth-client](https://github.com/amocrm/amocrm-oauth-client)
+3.0.0. An SDK is a client, not the server: it shows what a request has to look like and which
+answer fields its authors read. Where it says nothing, it proves nothing either way.
 
-**Limits and transport**
+### What the official SDK confirms
+
+Requests and errors:
+
+- The account address `https://{subdomain}.{domain}`, the API under `/api/v4/`,
+  `Authorization: Bearer <token>` on every request, and a long-lived token sent exactly like an
+  access token:
+  [`AmoCRMApiClient.php#L58`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Client/AmoCRMApiClient.php#L58), [`Leads.php#L45`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/Leads.php#L45), [`AmoCRMApiRequest.php#L677-L683`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Client/AmoCRMApiRequest.php#L677-L683),
+  [`LongLivedAccessToken.php#L20`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Client/LongLivedAccessToken.php#L20).
+- JSON write bodies: [`AmoCRMApiRequest.php#L216-L217`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Client/AmoCRMApiRequest.php#L216-L217).
+- Query parameters in PHP bracket notation: `filter[...]` with indexed lists,
+  `order[field]=asc|desc`, `with` joined with commas, `query` at the top level, `page` and
+  `limit`, booleans as `1` and `0`:
+  [`LeadsFilter.php#L427-L492`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Filters/LeadsFilter.php#L427-L492),
+  [`OrderTrait.php#L36-L39`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Filters/Traits/OrderTrait.php#L36-L39), [`BaseEntity.php#L84-L87`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/BaseEntity.php#L84-L87),
+  [`PagesFilterTrait.php#L56-L67`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Filters/Traits/PagesFilterTrait.php#L56-L67), [`TasksFilter.php#L268-L270`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Filters/TasksFilter.php#L268-L270).
+- `204 No Content` for an empty list: [`AmoCRMApiRequest.php#L601-L607`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Client/AmoCRMApiRequest.php#L601-L607). The SDK's README puts it as "nothing
+  bad happened, there is simply no data for your request" ([`README.md#L622`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/README.md#L622)).
+- With OAuth2, one token refresh and one more try after a 401; with a long-lived token, none:
+  [`AmoCRMApiRequest.php#L240-L252`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Client/AmoCRMApiRequest.php#L240-L252), [`AmoCRMApiRequest.php#L159-L163`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Client/AmoCRMApiRequest.php#L159-L163).
+- A 400 with `validation-errors` is a validation error, error bodies carry `detail`, and a 429
+  may come with a body that is not JSON: [`AmoCRMApiRequest.php#L609-L631`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Client/AmoCRMApiRequest.php#L609-L631), [`AmoCRMApiRequest.php#L649-L666`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Client/AmoCRMApiRequest.php#L649-L666).
+- Batches of 50: the SDK's README advises at most 50 entities per batch request
+  ([`README.md#L196-L197`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/README.md#L196-L197)).
+
+OAuth2:
+
+- The token endpoint is `/oauth2/access_token` on the account's own host, the one the
+  redirect's `referer` names: [`AmoCRM.php#L124-L143`](https://github.com/amocrm/amocrm-oauth-client/blob/6041dc7/src/AmoCRM.php#L124-L143),
+  [`get_token.php#L7-L9`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/examples/get_token.php#L7-L9).
+- A `POST` with `client_id`, `client_secret`, `redirect_uri`, `grant_type` and `code` or
+  `refresh_token`; `access_token`, `refresh_token` and `expires_in` read from the answer; the
+  new refresh token saved after every refresh: [`AmoCRMOAuth.php#L143-L145`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/OAuth/AmoCRMOAuth.php#L143-L145), [`AmoCRMOAuth.php#L170-L172`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/OAuth/AmoCRMOAuth.php#L170-L172),
+  [`AmoCRMOAuth.php#L214-L218`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/OAuth/AmoCRMOAuth.php#L214-L218), [`get_token.php#L44-L52`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/examples/get_token.php#L44-L52).
+- Token errors with `title`, `detail` and `hint`, and status 400 or above:
+  [`AmoCRM.php#L160-L165`](https://github.com/amocrm/amocrm-oauth-client/blob/6041dc7/src/AmoCRM.php#L160-L165), [`AmoCRMException.php#L10-L29`](https://github.com/amocrm/amocrm-oauth-client/blob/6041dc7/src/AmoCRMException.php#L10-L29).
+- No token path of its own for Kommo or `amocrm.com`; only the install button script differs:
+  [`AmoCRMOAuth.php#L369-L372`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/OAuth/AmoCRMOAuth.php#L369-L372).
+
+Lists:
+
+- `_links.next.href` as the only sign of a next page, and an absolute link under the account's
+  own address: [`BaseEntity.php#L107-L109`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/BaseEntity.php#L107-L109), [`PageMethodsTrait.php#L28-L42`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/Traits/PageMethodsTrait.php#L28-L42), [`AmoCRMApiRequest.php#L522-L527`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Client/AmoCRMApiRequest.php#L522-L527).
+- The filters this README uses: `filter[statuses][0][pipeline_id]` and `[status_id]`,
+  `filter[updated_at][from]`, and for tasks `is_completed`, `entity_type`, `entity_id`,
+  `responsible_user_id`, `id` and `updated_at`; for notes `note_type`, `id`, `updated_at` and
+  `entity_id`: [`LeadsFilter.php#L311-L326`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Filters/LeadsFilter.php#L311-L326),
+  [`BaseRangeFilter.php#L64-L70`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Filters/BaseRangeFilter.php#L64-L70), [`TasksFilter.php#L256-L299`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Filters/TasksFilter.php#L256-L299),
+  [`NotesFilter.php#L124-L142`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Filters/NotesFilter.php#L124-L142).
+- `with=contacts` and `with=loss_reason` on leads, with the contacts embedded along with
+  `is_main`: [`LeadModel.php#L1064-L1074`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/LeadModel.php#L1064-L1074), [`LeadModel.php#L838-L841`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/LeadModel.php#L838-L841), [`ContactModel.php#L561-L563`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/ContactModel.php#L561-L563).
+
+Writes:
+
+- `POST` and `PATCH /api/v4/{entity}` with JSON arrays, answered with `_embedded.<entity>`
+  items that carry `id`, `request_id` and `updated_at`, `request_id` coming back as it was sent:
+  [`BaseEntity.php#L189-L228`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/BaseEntity.php#L189-L228), [`Leads.php#L108-L136`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/Leads.php#L108-L136),
+  [`BaseApiCollection.php#L325-L344`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Collections/BaseApiCollection.php#L325-L344).
+- `POST /api/v4/leads/complex` with the contact, the company and the tags under `_embedded`,
+  answered with an array of `id`, `contact_id`, `company_id`, `request_id` and `merged`:
+  [`LeadModel.php#L1030-L1059`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/LeadModel.php#L1030-L1059), [`Leads.php#L158-L225`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/Leads.php#L158-L225).
+- Custom field values written as `field_id` or `field_code` with `values`, never with
+  `field_name` or `field_type`:
+  [`BaseCustomFieldValuesModel.php#L149-L157`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/CustomFieldsValues/BaseCustomFieldValuesModel.php#L149-L157).
+  `PHONE` and `EMAIL` set by code, with an enum code such as `WORK`:
+  [`contacts_actions.php#L88-L106`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/examples/contacts_actions.php#L88-L106), [`contacts_actions.php#L136-L152`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/examples/contacts_actions.php#L136-L152).
+  A select field set by its option text: [`invoices_actions.php#L149`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/examples/invoices_actions.php#L149).
+- Links: `POST /{entity}/{id}/link` and `/unlink` with `to_entity_id`, `to_entity_type` and
+  `metadata`, an unlink answered with 204, `is_main` in the metadata:
+  [`LinkMethodsTrait.php#L57-L144`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/Traits/LinkMethodsTrait.php#L57-L144),
+  [`ContactModel.php#L813-L826`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/ContactModel.php#L813-L826). Tags written as `{name}` or `{id}`:
+  [`TagModel.php#L161-L174`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/TagModel.php#L161-L174).
+- Completing a task with `PATCH /api/v4/tasks/{id}`, `is_completed` and `result.text`:
+  [`BaseEntity.php#L238-L254`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/BaseEntity.php#L238-L254), [`TaskModel.php#L557-L571`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/TaskModel.php#L557-L571).
+
+Data:
+
+- Status 142 is "won" and 143 "lost": [`LeadModel.php#L39-L40`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/LeadModel.php#L39-L40). Task type 2 is a meeting:
+  [`TaskModel.php#L18-L22`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/TaskModel.php#L18-L22).
+- Notes at `/{entity_type}/notes` and `/{entity_type}/{id}/notes`, and a `common` note
+  with its text in `params.text`: [`EntityNotes.php#L46-L61`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/EntityNotes.php#L46-L61),
+  [`CommonNote.php#L16-L28`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/NoteType/CommonNote.php#L16-L28).
+- Pipelines at `/api/v4/leads/pipelines`, without paging; custom fields at
+  `/{entity_type}/custom_fields`; webhook subscriptions at `/api/v4/webhooks`:
+  [`Pipelines.php#L37`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/Leads/Pipelines.php#L37),
+  [`CustomFields.php#L42`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/CustomFields.php#L42),
+  [`Webhooks.php#L29`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/Webhooks.php#L29).
+
+### What the cross-check made me fix
+
+Each change to the code came with a test that failed before it.
+
+- **One note is fetched through its entity.** `notes.get(note_id)` asked for
+  `/{entity_type}/notes/{id}`, a route the SDK never uses. It fetches a note at
+  `/{entity_type}/{entity_id}/notes/{id}`, and its example says both ids are needed
+  ([`EntityNotes.php#L186-L198`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/EntityNotes.php#L186-L198),
+  [`notes_actions.php#L87-L95`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/examples/notes_actions.php#L87-L95)). The method is now
+  `notes.get(note_id, entity_id=...)`.
+- **A short page no longer ends the walk.** `iterate()` stopped at any page with fewer than
+  `limit` items, even when amoCRM linked a next one. The SDK goes by the next link alone
+  ([`PageMethodsTrait.php#L28-L42`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/Traits/PageMethodsTrait.php#L28-L42)), and so does `iterate()` now. If a last page ever links a next one, that
+  costs one request more.
+- **A moved account is looked up, not guessed from a redirect.** When a refresh is refused
+  with 401 or 404, the SDK reads `api_domain` from the access token, asks
+  `GET https://{api_domain}/oauth2/account/current/subdomain` with the refresh token in
+  `X-Refresh-Token`, and refreshes again at the domain it gets ([`AmoCRMOAuth.php#L173-L202`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/OAuth/AmoCRMOAuth.php#L173-L202),
+  [`AmoCRMOAuth.php#L507-L548`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/OAuth/AmoCRMOAuth.php#L507-L548), [`AmoCRMOAuth.php#L660-L698`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/OAuth/AmoCRMOAuth.php#L660-L698),
+  [`get_account_subdomain.php#L11-L24`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/examples/get_account_subdomain.php#L11-L24)). The client now asks the same and raises
+  `AccountMovedError` with the new host. I had listed a 3xx as the way a move shows up; that
+  was a guess, and the SDK has no code for it.
+- **Redirects, for the right reason.** I wrote that redirects are not followed because the
+  token would go with them, but httpx drops the token on a redirect to another host anyway.
+  The real reasons are that a 301, 302 or 303 replays a write as a `GET` without its body, and
+  a 307 or 308 sends the body wherever it points, client secret and refresh token included for
+  the token endpoint. A client passed as `http=` with `follow_redirects=True` did follow them;
+  now neither API nor token requests ever do.
+- **The `hint` of an error is kept.** The SDK shows token errors as "title: detail (hint)"
+  ([`AmoCRMException.php#L10-L29`](https://github.com/amocrm/amocrm-oauth-client/blob/6041dc7/src/AmoCRMException.php#L10-L29)). The client dropped the hint whenever there was a
+  detail, so "Token has been revoked" never reached the logs.
+- **One contact and one company per complex lead.** The SDK sends one of each to
+  `/leads/complex` and reads one `contact_id` and one `company_id` back
+  ([`LeadModel.php#L1036-L1043`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/LeadModel.php#L1036-L1043), [`Leads.php#L207-L219`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/EntitiesServices/Leads.php#L207-L219)). A second one now raises `ValueError` before
+  anything is sent.
+- **Prices with cents.** `Lead.price` was an `int`. The SDK sends a float and notes that Kommo
+  supports minor currency units ([`LeadModel.php#L261-L282`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/LeadModel.php#L261-L282), [`LeadModel.php#L945-L947`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/LeadModel.php#L945-L947)), so it is now
+  `int | float`.
+- **Task names.** The tasks filter is `task_type_id`; the SDK still sends the older `task_type`
+  as well and marks it for removal ([`TasksFilter.php#L272-L279`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Filters/TasksFilter.php#L272-L279)). Task type 1 is a follow-up, with
+  the old name "call" deprecated ([`TaskModel.php#L18-L22`](https://github.com/amocrm/amocrm-api-php/blob/a0072fe/src/AmoCRM/Models/TaskModel.php#L18-L22)).
+
+### What still rests on the documentation alone
+
+The SDK shows none of this, mostly because it is about what the server does. If amoCRM behaves
+differently, these are the places to look first.
+
+**Limits and errors**
 
 - 7 requests per second per integration and 50 per account; 429 when exceeded, then 403 and an
-  IP block for repeated flooding. The default `rate_limit=7` comes from there.
-- `Retry-After` on a 429: the documentation does not promise it. It is honoured when present.
-- Whether a write answered with 429 was applied: the documentation does not say. That is why
-  writes are not resent after a 429 without `retry=True`.
-- A 3xx for an account that moved (to `kommo.com`, say) is an assumption; the client raises any
-  3xx it gets.
-- Kommo accounts on `kommo.com` serve the same API v4.
-
-**Lists**
-
-- `204 No Content` for an empty list, and for an entity fetched by an id that does not exist (a
-  404 is handled the same way).
-- `page` and `limit` (at most 250), `_page`, and `_links.next.href` in list answers.
-- The filter names used in this README (`filter[statuses][0][pipeline_id]`,
-  `filter[updated_at][from]`, `filter[is_completed]`, `filter[entity_type]`,
-  `filter[entity_id]`), and `with=contacts` embedding contact ids with `is_main`.
-
-**Writes**
-
-- At most 50 leads per `POST /leads/complex`, up to 250 items in other writes.
-- Write answers: `_embedded.<entity>` with `id` and `request_id` per item; for
-  `/leads/complex` a JSON array of `id`, `contact_id`, `company_id`, `request_id` (a list) and
-  `merged`.
-- `request_id` comes back unchanged (a number sent comes back as a number), and is the item's
-  position in the request when the caller did not set one.
-- Error bodies: `title`, `type`, `status`, `detail`; on a 400, `validation-errors` with
-  `request_id` and `errors` of `code`, `path` and `detail` per refused item, and the whole
-  request refused. 402 for an account that is not paid.
-- Links: `POST /{entity}/{id}/link` with `to_entity_id`, `to_entity_type` and `metadata`
-  (`is_main`, `catalog_id`, `quantity`), answered with `_embedded.links`.
-- Completing a task with `PATCH /tasks/{id}` and `is_completed` plus `result.text`.
-- A select field accepting the option text as `value` or its `enum_id`.
+  IP block for repeated flooding. The SDK has no limiter, and its README only reminds you of the
+  limits. The default `rate_limit=7` comes from the documentation.
+- `Retry-After` on a 429, which the SDK never reads, and whether a write answered with 429 was
+  applied: the SDK retries nothing, so it does not say. That is why writes are not resent after
+  a 429 without `retry=True`.
+- `limit` at most 250 per page, up to 250 items per write, and 50 leads per `/leads/complex` as
+  a hard limit. The SDK asks for 50 per page by default and only recommends 50 per batch.
+- 402 for an account that is not paid, 403 for missing rights or a block, 422 as a validation
+  error, and a 400 refusing the whole request instead of saving part of it. Apart from 401,
+  204, a 400 with `validation-errors` and a 429 whose body is not JSON, the SDK raises one
+  generic exception for every error status.
+- The inside of `validation-errors` (`request_id`, then `errors` with `code`, `path` and
+  `detail`), the problem fields `type` and `status`, and `request_id` being the item's position
+  when the caller sets none. The SDK always sends its own `request_id` and never looks inside
+  that array.
+- `204 No Content` for an entity fetched by an id that does not exist, and `_page` in list
+  answers.
+- A 3xx from an API endpoint for a wrong subdomain or domain. The client raises any 3xx it gets.
 
 **OAuth2**
 
-- The token endpoint `/oauth2/access_token` on the account's domain, its JSON request bodies,
-  and the answer fields `token_type`, `expires_in`, `access_token`, `refresh_token`.
-- The 24-hour access token, the 20-minute single-use authorization code, the 3-month refresh
-  token, and the rotation of the refresh token on every refresh.
-- Long-lived tokens sent as a bearer token, like an access token.
+- A JSON body at `/oauth2/access_token`. The SDK sends the same fields form-encoded. Also
+  `token_type` in the answer, which the SDK never reads.
+- The 24-hour access token, the 20-minute single-use code, the 3-month refresh token, and the
+  old refresh token dying after a refresh. The handling of two processes that refresh at once
+  relies on that last one.
+- Kommo accounts on `kommo.com` serving the same API v4, and accounts living on `amocrm.ru`,
+  `amocrm.com` and `kommo.com` only.
 
 **Data**
 
 - PHP's `json_encode` habits: `[]` for empty objects, `"result": []` on tasks without a result,
   numbers in text fields.
-- Status 142 is "won" and 143 "lost" in every pipeline; task type 1 is a follow-up (formerly
-  "call") and 2 a meeting; field codes `PHONE`, `EMAIL` and `POSITION`, with enum codes such as `WORK` and `MOB`.
+- The enum code `MOB` and the field code `POSITION` (the SDK shows `PHONE`, `EMAIL`, `WORK` and
+  `WORKDD`), and `color` being accepted in an entity's `_embedded.tags`.
 
 **Webhooks**
 
-- The body format, including notes under `leads[note][0][note][...]` and date fields sent as
-  `values][0]=` without `[value]`; all values strings.
-- No signature of any kind on account webhooks.
-- Resending, and switching off endpoints that keep failing or answering slowly.
+- Everything about incoming account webhooks: the form-encoded body (`leads[status][0][...]`,
+  notes under `leads[note][0][note][...]`, date fields sent as `values][0]=` without `[value]`),
+  every value a string, no signature of any kind, and resending to endpoints that fail or answer
+  slowly before switching them off. The SDK has no code that receives webhooks; it only manages
+  subscriptions.
 
 What was checked here, without amoCRM: the requests the client builds (paths, query encoding,
 bodies), every retry decision in the table above, the spacing on a real clock, pagination with
-next links that drop parameters or stand still, token refresh with failed saves and with two
-processes sharing a storage, the webhook parser on 10,000-field bodies, and that no access
-token, refresh token, client secret or long-lived token shows up in logs at DEBUG, in `repr()`s,
-error messages or tracebacks.
+next links that drop parameters, stand still or follow short pages, token refresh with failed
+saves, with two processes sharing a storage and with an account that moved, the webhook parser
+on 10,000-field bodies, and that no access token, refresh token, client secret or long-lived
+token shows up in logs at DEBUG, in `repr()`s, error messages or tracebacks.
 
 If you run it against a real account and an answer differs, please open an issue with the
 request and the answer, tokens removed.
@@ -1031,8 +1160,8 @@ pytest --cov
 Every change in behaviour comes with a test that failed before it, and a bug fix starts with the
 test that shows the bug. The code stays `mypy --strict` clean, public objects have docstrings,
 logging goes through `logging.getLogger(__name__)`, and nothing logs a token. Test answers
-follow the documentation; an answer recorded from a real account (tokens removed) is welcome,
-with a note on where it came from.
+follow the documentation and the official PHP SDK; an answer recorded from a real account
+(tokens removed) is welcome, with a note on where it came from.
 
 The README samples are tests: every Python block after a `<!-- sample: name -->` marker runs in
 `tests/test_readme.py` against respx mocks, and README.md and README.ru.md must carry the same
