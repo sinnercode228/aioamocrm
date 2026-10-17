@@ -781,9 +781,12 @@ and `completed`. The message reads like
 A `ValidationIssue` has `request_id`, `code`, `path` (such as `custom_fields_values.0.field_id`)
 and `detail`.
 
-Redirects are not followed, because the token would go with them. A 3xx is raised as
-`AmoCRMError` naming where it pointed (without the query), which usually means a wrong
-subdomain or domain, or an account that moved.
+Redirects are never followed, also when you pass an `http=` client built with
+`follow_redirects=True`: a 301, 302 or 303 would replay a write as a `GET` without its body,
+and a 307 or 308 would send the body (to the token endpoint, that is the client secret and the
+refresh token) wherever it points. A 3xx is raised as `AmoCRMError` naming where it pointed
+(without the query), which usually means a wrong subdomain or domain, or an account that
+moved.
 
 Wrong arguments fail before any request: `ValueError` for a `limit` outside 1 to 250, a blank
 token or an absolute URL outside the account, `TypeError` for an id that is not an `int`.

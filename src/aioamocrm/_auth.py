@@ -300,8 +300,13 @@ class OAuth2:
             "redirect_uri": self.redirect_uri,
         }
         try:
+            # A redirect is not followed whatever the client's settings: a 307 or 308 would
+            # post the client secret and the refresh token wherever it points.
             response = await endpoint.http.post(
-                endpoint.url, json=body, headers={"Accept": "application/json"}
+                endpoint.url,
+                json=body,
+                headers={"Accept": "application/json"},
+                follow_redirects=False,
             )
         except httpx.TransportError as exc:
             msg = f"the OAuth2 token endpoint could not be reached: {type(exc).__name__}"

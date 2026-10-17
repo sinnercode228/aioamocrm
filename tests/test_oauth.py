@@ -248,6 +248,28 @@ async def test_two_workers_refreshing_at_once_end_up_with_the_winners_tokens(
     assert route.call_count == 2
 
 
+async def test_a_token_request_does_not_follow_a_redirect_whatever_the_client(
+    mock: respx.MockRouter,
+) -> None:
+    # A 307 would make httpx post the body, client secret and refresh token included, to
+    # wherever the Location points.
+    elsewhere = mock.post("https://elsewhere.example.com/token").mock(return_value=token_answer(2))
+    mock.post(TOKEN_URL).mock(
+        return_value=httpx.Response(
+            307, headers={"Location": "https://elsewhere.example.com/token"}
+        )
+    )
+    storage = MemoryTokenStorage(valid_tokens(1, expires_at=NOW))
+    async with httpx.AsyncClient(follow_redirects=True) as http:
+        endpoint = TokenEndpoint(http=http, url=TOKEN_URL)
+        with pytest.raises(AuthError) as caught:
+            await oauth(storage).get_token(endpoint)
+
+    assert caught.value.status_code == 307
+    assert not elsewhere.called
+    assert await storage.load() == valid_tokens(1, expires_at=NOW)
+
+
 async def test_a_failed_refresh_raises_auth_error_and_keeps_the_old_tokens(
     endpoint: TokenEndpoint, mock: respx.MockRouter
 ) -> None:

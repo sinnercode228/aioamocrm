@@ -122,6 +122,28 @@ async def test_a_redirect_is_an_error_not_an_empty_list(
     assert caught.value.status_code == status
 
 
+async def test_a_redirect_is_raised_even_with_a_client_that_follows_redirects(
+    mock: respx.MockRouter,
+) -> None:
+    # httpx would replay this POST as a GET without its body and hand back the GET's answer
+    # as if it were the POST's; the client must stop at the 302 whatever http= it was given.
+    moved = {"Location": f"{API}/leads/elsewhere"}
+    post = mock.post("/api/v4/leads").mock(return_value=httpx.Response(302, headers=moved))
+    get = mock.get("/api/v4/leads/elsewhere").mock(
+        return_value=httpx.Response(200, json={"_embedded": {"leads": []}})
+    )
+    async with httpx.AsyncClient(follow_redirects=True) as http:
+        amo = AmoCRMClient(
+            subdomain="example", auth=LongLivedToken(TOKEN), http=http, rate_limit=None
+        )
+        with pytest.raises(AmoCRMError) as caught:
+            await amo.request("POST", "leads", json=[{"name": "Website order"}])
+
+    assert caught.value.status_code == 302
+    assert post.call_count == 1
+    assert not get.called
+
+
 async def test_a_redirect_without_a_location_is_still_an_error(
     amo: AmoCRMClient, mock: respx.MockRouter
 ) -> None:

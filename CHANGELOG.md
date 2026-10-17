@@ -27,8 +27,10 @@ All notable changes to this project are documented here. The format follows
   without the caller asking for it.
 - Typed errors: `AmoCRMError` and `AuthError`, `PaymentRequiredError`, `ForbiddenError`,
   `NotFoundError`, `ValidationError` (with every `ValidationIssue`), `RateLimitError`,
-  `ServerError`, `NetworkError`. Any answer outside 2xx is an error: redirects are not
-  followed (the token would go with them) and are raised naming where they pointed. Batched
+  `ServerError`, `NetworkError`. Any answer outside 2xx is an error: redirects are never
+  followed, also by an `http=` client built with `follow_redirects=True` (a write would be
+  replayed as a `GET`, or its body sent to another address), and are raised naming where they
+  pointed; the same holds for the token endpoint. Batched
   writes report `batch_offset` and the `completed` results of the chunks saved before a
   failure.
 - Lists: `iterate()` async iterators that follow `_links.next` (only when it names the next

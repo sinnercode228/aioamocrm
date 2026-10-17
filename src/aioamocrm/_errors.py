@@ -249,8 +249,11 @@ def _redirect_note(url: httpx.URL, location: str | None) -> str:
 def error_from_response(response: httpx.Response) -> AmoCRMError:
     """Build the typed exception for an error answer.
 
-    A 3xx is an error too: the client does not follow redirects (the token would go with
-    them), so it is raised as :class:`AmoCRMError` naming where it pointed, without the query.
+    A 3xx is an error too, raised as :class:`AmoCRMError` naming where it pointed, without the
+    query. The client never follows redirects: a 301, 302 or 303 would replay a write as a
+    ``GET`` without its body, and a 307 or 308 would send the body (for the token endpoint, the
+    client secret and the refresh token) wherever it points. The token is not the reason:
+    httpx drops it on a redirect to another host.
 
     Args:
         response: An answer with a 3xx, 4xx or 5xx status; its request must be set.
