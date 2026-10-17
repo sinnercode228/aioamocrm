@@ -112,6 +112,7 @@ async def test_a_client_raises_the_new_domain_after_a_401(mock: respx.MockRouter
         # Tokens issued before 21.08.2024 carry no api_domain, and opaque tokens none at all.
         ("access-1", 404, httpx.Response(200, json=MOVED)),
         (jwt({"aud": "client-id"}), 404, httpx.Response(200, json=MOVED)),
+        ("eyJhbGciOiJSUzI1NiJ9.bm90IGpzb24.c2ln", 404, httpx.Response(200, json=MOVED)),
         # An api_domain outside amoCRM and Kommo never gets the refresh token.
         (jwt({"api_domain": "api-a.example.com"}), 404, httpx.Response(200, json=MOVED)),
         (jwt({"api_domain": "evil.com/x?.amocrm.ru"}), 404, httpx.Response(200, json=MOVED)),
