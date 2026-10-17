@@ -6,11 +6,18 @@ The token endpoint, the request bodies and the answer come from the amoCRM v4 do
 against a live account here. Token requests are never retried: an authorization code works
 once, and a refresh that reached amoCRM but whose answer was lost has already burnt the old
 refresh token, so a blind retry cannot help and may hide what happened.
+
+A refresh refused with 401 or 404 may mean that the account's domain changed. The official PHP
+SDK (amocrm/amocrm-api-php) then asks ``GET https://{api_domain}/oauth2/account/current/subdomain``
+with the refresh token in ``X-Refresh-Token``, ``api_domain`` being a claim of the access-token
+JWT; this module asks the same and raises :class:`~aioamocrm.AccountMovedError` with the new host.
 """
 
 from __future__ import annotations
 
 import asyncio
+import base64
+import json
 import logging
 import time
 from collections.abc import Callable, Mapping
@@ -19,7 +26,8 @@ from typing import Any, Protocol, runtime_checkable
 
 import httpx
 
-from ._errors import AuthError, NetworkError, error_from_response
+from ._domains import is_account_host
+from ._errors import AccountMovedError, AuthError, NetworkError, error_from_response
 from ._tokens import MemoryTokenStorage, TokenSet, TokenStorage
 
 __all__ = ["Auth", "LongLivedToken", "OAuth2", "TokenEndpoint"]
@@ -27,6 +35,73 @@ __all__ = ["Auth", "LongLivedToken", "OAuth2", "TokenEndpoint"]
 logger = logging.getLogger(__name__)
 
 _HTTP_OK = 200
+# Refresh refusals after which the official PHP SDK looks the account's domain up.
+_MOVED_STATUSES = frozenset({401, 404})
+_ACCOUNT_DOMAIN_PATH = "/oauth2/account/current/subdomain"
+_JWT_PARTS = 3
+
+
+def _jwt_claim(token: str, name: str) -> str | None:
+    """Read a text claim of a JWT without checking its signature; ``None`` when there is none."""
+    parts = token.split(".")
+    if len(parts) != _JWT_PARTS:
+        return None
+    payload = parts[1]
+    try:
+        claims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
+    except ValueError:
+        return None
+    value = claims.get(name) if isinstance(claims, dict) else None
+    return value if isinstance(value, str) else None
+
+
+async def _moved_to(endpoint: TokenEndpoint, tokens: TokenSet) -> str | None:
+    """Ask amoCRM which host the account behind ``tokens`` lives on, if not the endpoint's.
+
+    The refresh token goes only to an ``api_domain`` under amoCRM's or Kommo's domains, and
+    only when the endpoint itself is an account host (not a proxy given as ``base_url``).
+    Tokens issued before 21.08.2024 have no ``api_domain``, so there is nothing to ask.
+
+    Returns:
+        The account's current host, or ``None`` when it could not be learnt or did not change.
+    """
+    current = httpx.URL(endpoint.url).host
+    api_domain = _jwt_claim(tokens.access_token, "api_domain")
+    if not is_account_host(current) or api_domain is None or not is_account_host(api_domain):
+        return None
+    try:
+        response = await endpoint.http.get(
+            f"https://{api_domain}{_ACCOUNT_DOMAIN_PATH}",
+            headers={"X-Refresh-Token": tokens.refresh_token, "Accept": "application/json"},
+            follow_redirects=False,
+        )
+        data = response.json() if response.status_code == _HTTP_OK else None
+    except (httpx.HTTPError, ValueError):
+        return None
+    domain = data.get("domain") if isinstance(data, Mapping) else None
+    if not isinstance(domain, str):
+        return None
+    domain = domain.strip().lower()
+    if not is_account_host(domain) or domain == current:
+        return None
+    return domain
+
+
+def _account_moved(refusal: AuthError, domain: str) -> AccountMovedError:
+    msg = (
+        f"{refusal.message}; the account now lives at {domain}: create the client for that "
+        "domain with the same tokens (this refresh token was not spent)"
+    )
+    return AccountMovedError(
+        msg,
+        domain=domain,
+        status_code=refusal.status_code,
+        title=refusal.title,
+        detail=refusal.detail,
+        body=refusal.body,
+        method=refusal.method,
+        url=refusal.url,
+    )
 
 
 def _newest(stored: TokenSet | None, current: TokenSet | None) -> TokenSet | None:
@@ -258,13 +333,18 @@ class OAuth2:
                 tokens = await self._request(
                     endpoint, {"grant_type": "refresh_token", "refresh_token": base.refresh_token}
                 )
-            except AuthError:
+            except AuthError as exc:
                 winner = await self._renewed_elsewhere(base)
-                if winner is None:
-                    raise
-                logger.info("OAuth2 refresh refused; using the tokens another process saved")
-                self._tokens = winner
-                return winner
+                if winner is not None:
+                    logger.info("OAuth2 refresh refused; using the tokens another process saved")
+                    self._tokens = winner
+                    return winner
+                if exc.status_code in _MOVED_STATUSES:
+                    domain = await _moved_to(endpoint, base)
+                    if domain is not None:
+                        logger.warning("OAuth2 refresh refused: the account moved to %s", domain)
+                        raise _account_moved(exc, domain) from exc
+                raise
             await self._store(tokens)
         logger.info("OAuth2 tokens refreshed; access token valid until %.0f", tokens.expires_at)
         return tokens

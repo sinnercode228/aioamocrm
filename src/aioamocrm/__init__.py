@@ -3,6 +3,7 @@
 from ._auth import Auth, LongLivedToken, OAuth2, TokenEndpoint
 from ._client import DOMAINS, AmoCRMClient
 from ._errors import (
+    AccountMovedError,
     AmoCRMError,
     AuthError,
     ForbiddenError,
@@ -48,6 +49,7 @@ from ._webhooks import Webhook, WebhookEvent, parse_webhook
 __all__ = [
     "DOMAINS",
     "Account",
+    "AccountMovedError",
     "AmoCRMClient",
     "AmoCRMError",
     "AmoModel",

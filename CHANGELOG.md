@@ -17,7 +17,10 @@ All notable changes to this project are documented here. The format follows
   concurrent requests, the rotated refresh token saved through a `TokenStorage`
   (`MemoryTokenStorage`, `JsonFileTokenStorage` with atomic writes and mode 0600), and
   adoption of tokens renewed by another process sharing the storage, also when that process
-  spent the refresh token first and this refresh was refused.
+  spent the refresh token first and this refresh was refused. A refresh refused with 401 or
+  404 is looked up the way the official PHP SDK does it
+  (`GET https://{api_domain}/oauth2/account/current/subdomain` with `X-Refresh-Token`), and
+  `AccountMovedError` names the account's new host without spending the refresh token.
 - `RateLimiter`: requests spaced at 7 per second by default, in arrival order, each measured
   from the moment the previous one went, so a stalled event loop never releases a burst;
   configurable or shared between clients.
@@ -25,14 +28,14 @@ All notable changes to this project are documented here. The format follows
   attempts; failures to connect are retried for every method, 429, 5xx and timeouts only for
   idempotent methods unless the call passes `retry=True`, so a write is never sent twice
   without the caller asking for it.
-- Typed errors: `AmoCRMError` and `AuthError`, `PaymentRequiredError`, `ForbiddenError`,
-  `NotFoundError`, `ValidationError` (with every `ValidationIssue`), `RateLimitError`,
-  `ServerError`, `NetworkError`. Messages carry amoCRM's `title`, `detail` and `hint`. Any
-  answer outside 2xx is an error: redirects are never followed, also by an `http=` client built
-  with `follow_redirects=True` (a write would be replayed as a `GET`, or its body sent to
-  another address), and are raised naming where they pointed; the same holds for the token
-  endpoint. Batched writes report `batch_offset` and the `completed` results of the chunks
-  saved before a failure.
+- Typed errors: `AmoCRMError` and `AuthError` (with `AccountMovedError`),
+  `PaymentRequiredError`, `ForbiddenError`, `NotFoundError`, `ValidationError` (with every
+  `ValidationIssue`), `RateLimitError`, `ServerError`, `NetworkError`. Messages carry amoCRM's
+  `title`, `detail` and `hint`. Any answer outside 2xx is an error: redirects are never
+  followed, also by an `http=` client built with `follow_redirects=True` (a write would be
+  replayed as a `GET`, or its body sent to another address), and are raised naming where they
+  pointed; the same holds for the token endpoint. Batched writes report `batch_offset` and the
+  `completed` results of the chunks saved before a failure.
 - Lists: `iterate()` async iterators that follow `_links.next` (only when it names the next
   page number, so a stuck link can neither loop nor skip pages) and stop on 204, on an empty
   page or without a next link (a short page that links a next one is followed), and

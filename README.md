@@ -185,6 +185,16 @@ What happens to the tokens after that:
 - **Expiry of the refresh token.** The documentation gives a refresh token 3 months. An
   integration that makes no request for longer has to be authorized by the account owner
   again.
+- **An account that moved.** When the owner changes the account's subdomain, or the account
+  moves to another domain, the token endpoint at the old address refuses the refresh with 401
+  or 404. The official PHP SDK then reads `api_domain` from the access token (a JWT; tokens
+  issued since 21.08.2024 carry it) and asks
+  `GET https://{api_domain}/oauth2/account/current/subdomain` with the refresh token in the
+  `X-Refresh-Token` header. `OAuth2` asks the same and raises `AccountMovedError`, an
+  `AuthError` whose `domain` is the new host, such as `newname.amocrm.ru`. The refresh token
+  is not spent by then: split the host like the `referer` below, create the client for it with
+  the same `OAuth2` and storage, and keep the host next to the tokens. Without `api_domain`, or
+  when the answer names the same host, the refusal is a plain `AuthError`.
 
 The `referer` parameter of the redirect comes from a URL anyone can forge. Split it into
 subdomain and domain (`subdomain, _, domain = referer.partition(".")`) and pass both to
@@ -755,6 +765,7 @@ to connect are retried in every case, since nothing reached amoCRM.
 ```text
 AmoCRMError                 any answer outside 2xx, 3xx included; base of everything below
 ├── AuthError               401, or tokens that could not be obtained or refreshed
+│   └── AccountMovedError   a refresh refused because the account moved; .domain is the host
 ├── PaymentRequiredError    402: the account is not paid
 ├── ForbiddenError          403: no rights, a blocked account, or an IP blocked for flooding
 ├── NotFoundError           404, or 204 for an entity asked for by id
@@ -903,6 +914,8 @@ Limits of 0.1.0:
   and its next request picks up the saved tokens. A storage with a shared lock closes it.
 - `retry=True` turns on retries for 429, 5xx and timeouts together; there is no switch for 429
   alone.
+- After `AccountMovedError` the client stays on the old host: you create a new one for the
+  account's new domain.
 - A `Retry-After` in the obsolete asctime date format is ignored, and the client backs off
   instead. Seconds, RFC 1123 and RFC 850 dates work.
 - Webhook payloads are strings in nested dicts, without models per entity.
@@ -917,6 +930,8 @@ Next, in this order:
 4. Webhook subscriptions through `/api/v4/webhooks`.
 5. A token storage recipe with a shared lock (a PostgreSQL row lock or Redis) for several
    processes.
+6. Move a live client to the account's new host after `AccountMovedError` and refresh there
+   once, as the official PHP SDK does, with the host kept in `TokenSet`.
 
 ## Testing your code
 

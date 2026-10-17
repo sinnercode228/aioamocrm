@@ -20,6 +20,7 @@ from typing import Any
 import httpx
 
 __all__ = [
+    "AccountMovedError",
     "AmoCRMError",
     "AuthError",
     "ForbiddenError",
@@ -78,6 +79,23 @@ class AmoCRMError(Exception):
 
 class AuthError(AmoCRMError):
     """The credentials were rejected (HTTP 401) or a token could not be obtained or refreshed."""
+
+
+class AccountMovedError(AuthError):
+    """A refresh was refused because the account now lives at another domain.
+
+    Raised when the token endpoint answers a refresh with 401 or 404 and amoCRM, asked where
+    the account is now (``GET /oauth2/account/current/subdomain``), names another host. The
+    refresh token was not spent: create the client for :attr:`domain` with the same
+    :class:`~aioamocrm.OAuth2` and storage, and the next request refreshes there.
+
+    Attributes:
+        domain: The account's current host, such as ``newname.amocrm.ru``.
+    """
+
+    def __init__(self, message: str, *, domain: str, **kwargs: Any) -> None:
+        super().__init__(message, **kwargs)
+        self.domain = domain
 
 
 class PaymentRequiredError(AmoCRMError):

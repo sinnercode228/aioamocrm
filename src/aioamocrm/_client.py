@@ -13,6 +13,7 @@ from typing import Any
 import httpx
 
 from ._auth import Auth, OAuth2, TokenEndpoint
+from ._domains import DOMAINS
 from ._errors import AmoCRMError, NetworkError, error_from_response, parse_retry_after
 from ._params import encode_mapping
 from ._ratelimit import RateLimiter
@@ -32,9 +33,6 @@ from ._version import __version__
 __all__ = ["DOMAINS", "AmoCRMClient"]
 
 logger = logging.getLogger(__name__)
-
-#: Account domains of amoCRM (Russia, international) and Kommo.
-DOMAINS = ("amocrm.ru", "amocrm.com", "kommo.com")
 
 _SUBDOMAIN = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
 _TOO_MANY_REQUESTS = 429
