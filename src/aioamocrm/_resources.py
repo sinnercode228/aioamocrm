@@ -554,8 +554,11 @@ class CompaniesResource(EntityResource[Company]):
 class TasksResource(_Listing[Task]):
     """``amo.tasks``: list, get, create, update and complete tasks.
 
-    ``filter`` takes ``responsible_user_id``, ``is_completed``, ``task_type``,
-    ``entity_type``, ``entity_id``, ``id`` and ``updated_at``.
+    ``filter`` takes ``responsible_user_id``, ``is_completed``, ``task_type_id``,
+    ``entity_type``, ``entity_id`` (together with ``entity_type``), ``id`` and ``updated_at``.
+    The official PHP SDK sends the type under both ``task_type_id`` and the older
+    ``task_type``, the latter marked in its code for removal; pass both to be safe:
+    ``filter={"task_type_id": 2, "task_type": 2}``.
     """
 
     def __init__(self, client: AmoCRMClient) -> None:
