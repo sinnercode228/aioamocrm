@@ -294,6 +294,7 @@ async def test_a_failed_refresh_raises_auth_error_and_keeps_the_old_tokens(
 
     assert caught.value.status_code == 400
     assert "The refresh token is invalid." in str(caught.value)
+    assert "Token has been revoked" in str(caught.value)
     assert "client-secret" not in str(caught.value)
     assert "refresh-1" not in str(caught.value)
     assert await storage.load() == old

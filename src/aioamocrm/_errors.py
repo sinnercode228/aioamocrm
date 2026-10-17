@@ -260,15 +260,17 @@ def error_from_response(response: httpx.Response) -> AmoCRMError:
 
     Returns:
         The exception to raise. Its message names the method, the path (never the query string,
-        which may hold search terms) and whatever ``title`` / ``detail`` amoCRM sent.
+        which may hold search terms) and whatever ``title`` / ``detail`` amoCRM sent, with
+        ``hint`` in brackets after the detail when it adds something.
     """
     request = response.request
     url = request.url.copy_with(query=None, fragment=None)
     body = _decode_body(response)
-    title = detail = None
+    title = detail = hint = None
     if isinstance(body, Mapping):
         title = _text(body.get("title"))
         detail = _text(body.get("detail") or body.get("hint"))
+        hint = _text(body.get("hint"))
 
     status = response.status_code
     parts = [f"HTTP {status}"]
@@ -276,6 +278,9 @@ def error_from_response(response: httpx.Response) -> AmoCRMError:
         parts.append(f" {title}")
     if detail:
         parts.append(f": {detail}")
+        if hint and hint != detail:
+            # The token endpoint puts the reason there ("Token has been revoked").
+            parts.append(f" ({hint})")
     elif isinstance(body, str) and body.strip():
         parts.append(f": {_short(body.strip())}")
     parts.append(f" ({request.method} {url.path})")

@@ -775,8 +775,10 @@ for lead_id in (1, 2):
 Every error has `status_code` (`None` without an answer), `title` and `detail` from amoCRM's
 error body, `body` (the decoded answer), `method`, `url`, and for batched writes `batch_offset`
 and `completed`. The message reads like
-`HTTP 402 Payment Required: Account is not paid (GET /api/v4/leads/2)`. Neither the message nor
-`url` includes the query string, which may hold search terms, and no error carries a token.
+`HTTP 402 Payment Required: Account is not paid (GET /api/v4/leads/2)`. When the body also has a
+`hint`, as the token endpoint's errors do, it follows the detail in brackets:
+`The refresh token is invalid. (Token has been revoked)`. Neither the message nor `url` includes
+the query string, which may hold search terms, and no error carries a token.
 
 A `ValidationIssue` has `request_id`, `code`, `path` (such as `custom_fields_values.0.field_id`)
 and `detail`.

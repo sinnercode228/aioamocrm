@@ -150,6 +150,37 @@ def test_payment_required_names_the_account_problem() -> None:
     assert "Account is not paid" in str(error)
 
 
+def test_the_hint_is_shown_next_to_the_detail() -> None:
+    # The token endpoint's error shape; the official PHP SDK shows "title: detail (hint)".
+    body = {
+        "hint": "Token has been revoked",
+        "title": "Invalid request",
+        "type": "https://developers.amocrm.ru/v3/errors/OAuthProblemJson",
+        "status": 400,
+        "detail": "The refresh token is invalid.",
+    }
+    error = error_from_response(response(400, body))
+    assert str(error).startswith(
+        "HTTP 400 Invalid request: The refresh token is invalid. (Token has been revoked) (POST"
+    )
+    assert error.detail == "The refresh token is invalid."
+
+
+@pytest.mark.parametrize(
+    ("body", "detail"),
+    [
+        ({"title": "Invalid request", "hint": "Token has expired"}, "Token has expired"),
+        ({"title": "Invalid request", "detail": "Same text", "hint": "Same text"}, "Same text"),
+    ],
+)
+def test_a_hint_alone_or_repeating_the_detail_is_shown_once(
+    body: dict[str, str], detail: str
+) -> None:
+    error = error_from_response(response(400, body))
+    assert error.detail == detail
+    assert str(error).count(detail) == 1
+
+
 def test_retry_after_is_kept_on_rate_limit_errors() -> None:
     error = error_from_response(response(429, headers={"Retry-After": "3"}))
     assert isinstance(error, RateLimitError)

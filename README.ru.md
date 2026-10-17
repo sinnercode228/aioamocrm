@@ -784,9 +784,10 @@ for lead_id in (1, 2):
 У каждой ошибки есть `status_code` (`None`, если ответа не было), `title` и `detail` из тела
 ошибки amoCRM, `body` (разобранный ответ), `method`, `url`, а у пакетных записей ещё
 `batch_offset` и `completed`. Сообщение выглядит так:
-`HTTP 402 Payment Required: Account is not paid (GET /api/v4/leads/2)`. Ни сообщение, ни `url`
-не содержат строку запроса, в которой могут быть поисковые фразы, и ни одна ошибка не содержит
-токен.
+`HTTP 402 Payment Required: Account is not paid (GET /api/v4/leads/2)`. Если в теле есть ещё и
+`hint`, как в ошибках эндпоинта токенов, он идёт в скобках после `detail`:
+`The refresh token is invalid. (Token has been revoked)`. Ни сообщение, ни `url` не содержат
+строку запроса, в которой могут быть поисковые фразы, и ни одна ошибка не содержит токен.
 
 У `ValidationIssue` есть `request_id`, `code`, `path` (например,
 `custom_fields_values.0.field_id`) и `detail`.
