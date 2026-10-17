@@ -552,7 +552,7 @@ call = Task(
     text="Call the client back",
     entity_type="leads",
     entity_id=lead_id,
-    task_type_id=1,  # 1 is a call, 2 a meeting
+    task_type_id=1,  # 1 is a follow-up, 2 a meeting
     complete_till=int(time.time()) + 3600,
 )
 await amo.tasks.create([call])
@@ -881,8 +881,8 @@ are the behaviours that rest on it:
 
 - PHP's `json_encode` habits: `[]` for empty objects, `"result": []` on tasks without a result,
   numbers in text fields.
-- Status 142 is "won" and 143 "lost" in every pipeline; task type 1 is a call and 2 a meeting;
-  field codes `PHONE`, `EMAIL` and `POSITION`, with enum codes such as `WORK` and `MOB`.
+- Status 142 is "won" and 143 "lost" in every pipeline; task type 1 is a follow-up (formerly
+  "call") and 2 a meeting; field codes `PHONE`, `EMAIL` and `POSITION`, with enum codes such as `WORK` and `MOB`.
 
 **Webhooks**
 

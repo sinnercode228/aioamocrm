@@ -398,8 +398,8 @@ class TaskResult(AmoModel):
 class Task(AmoModel):
     """A task (``/api/v4/tasks``).
 
-    ``complete_till`` is a Unix time; ``task_type_id`` is 1 for a call and 2 for a meeting
-    (or the id of a custom task type).
+    ``complete_till`` is a Unix time; ``task_type_id`` is 1 for a follow-up ("Связаться",
+    formerly "call") and 2 for a meeting, or the id of a custom task type.
     """
 
     id: int | None = None
