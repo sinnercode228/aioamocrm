@@ -4,6 +4,7 @@
 
 [![CI](https://github.com/sinnercode228/aioamocrm/actions/workflows/ci.yml/badge.svg)](https://github.com/sinnercode228/aioamocrm/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/aioamocrm.svg)](https://pypi.org/project/aioamocrm/)
+[![Python versions](https://img.shields.io/pypi/pyversions/aioamocrm.svg)](https://pypi.org/project/aioamocrm/)
 
 Асинхронный клиент amoCRM API v4 для Python. Работает и с Kommo: там тот же API, только на
 `kommo.com`. Библиотека берёт на себя то, что каждая интеграция с amoCRM рано или поздно пишет
