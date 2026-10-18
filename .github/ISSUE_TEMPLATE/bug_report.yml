@@ -1,0 +1,123 @@
+name: Bug report
+description: aioamocrm does something other than the README says, or amoCRM answers differently.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A security problem, such as a token sent to the wrong host or written to a log, goes
+        through [SECURITY.md](https://github.com/sinnercode228/aioamocrm/blob/main/SECURITY.md),
+        not a public issue.
+
+        The tests run against mocked answers written from the amoCRM documentation and checked
+        against the official PHP SDK. If a real account answered something the library did not
+        expect, the answer itself is the most useful part of the report.
+  - type: input
+    id: version
+    attributes:
+      label: aioamocrm version
+      description: '`python -c "import aioamocrm; print(aioamocrm.__version__)"`'
+      placeholder: "0.1.1"
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: "3.12.3"
+    validations:
+      required: true
+  - type: input
+    id: httpx
+    attributes:
+      label: httpx version
+      description: '`python -c "import httpx; print(httpx.__version__)"`'
+      placeholder: "0.28.1"
+    validations:
+      required: true
+  - type: input
+    id: pydantic
+    attributes:
+      label: pydantic version
+      description: '`python -c "import pydantic; print(pydantic.__version__)"`'
+      placeholder: "2.11.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: auth
+    attributes:
+      label: Authorization
+      options:
+        - LongLivedToken
+        - OAuth2 with MemoryTokenStorage
+        - OAuth2 with JsonFileTokenStorage
+        - OAuth2 with my own TokenStorage
+        - Not related to authorization (webhook parsing, models)
+    validations:
+      required: true
+  - type: dropdown
+    id: domain
+    attributes:
+      label: Account domain
+      options:
+        - amocrm.ru
+        - amocrm.com
+        - kommo.com
+        - Not related to an account (webhook parsing, models)
+  - type: input
+    id: endpoint
+    attributes:
+      label: Endpoint
+      description: The API method and path involved, if any.
+      placeholder: "POST /api/v4/leads/complex"
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The exception with its message, or the wrong result.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: If the README or the amoCRM documentation says otherwise, link the passage.
+    validations:
+      required: true
+  - type: textarea
+    id: code
+    attributes:
+      label: Minimal code
+      description: >-
+        The smallest script or test that shows it. A test with respx mocks, like the ones in
+        `tests/`, shows it without an account.
+      render: python
+    validations:
+      required: true
+  - type: textarea
+    id: answer
+    attributes:
+      label: amoCRM's answer
+      description: >-
+        The status code and body amoCRM sent, for example from the `body` of the error. For a
+        webhook, the raw request body. Remove tokens and personal data.
+      render: text
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and traceback
+      description: >-
+        The `aioamocrm` loggers at DEBUG, and the traceback if there is one. httpx logs full
+        URLs with their query strings on its own logger, so check those lines before pasting.
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched the existing issues.
+          required: true
+        - label: >-
+            The code, answers and logs above contain no access or refresh token, client secret,
+            webhook URL secret or personal data.
+          required: true
