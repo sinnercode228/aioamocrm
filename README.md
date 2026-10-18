@@ -1178,6 +1178,9 @@ The README samples are tests: every Python block after a `<!-- sample: name -->`
 samples. Bugs and questions go to
 [GitHub issues](https://github.com/sinnercode228/aioamocrm/issues).
 
+[CONTRIBUTING.md](https://github.com/sinnercode228/aioamocrm/blob/main/CONTRIBUTING.md) has the rest: the
+lowest supported versions, the test fixtures, the changelog and the commit style.
+
 ## License
 
 MIT, see [LICENSE](https://github.com/sinnercode228/aioamocrm/blob/main/LICENSE).

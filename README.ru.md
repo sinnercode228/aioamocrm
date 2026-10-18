@@ -1194,6 +1194,10 @@ pytest --cov
 же примеры. Об ошибках и с вопросами — в
 [issues на GitHub](https://github.com/sinnercode228/aioamocrm/issues).
 
+Остальное (самые старые поддерживаемые версии, тестовые фикстуры, CHANGELOG, стиль коммитов)
+описано в [CONTRIBUTING.md](https://github.com/sinnercode228/aioamocrm/blob/main/CONTRIBUTING.md),
+по-английски, с коротким разделом на русском в конце.
+
 ## Лицензия
 
 MIT, см. [LICENSE](https://github.com/sinnercode228/aioamocrm/blob/main/LICENSE).
