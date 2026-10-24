@@ -4,6 +4,7 @@ English · [Русский](https://github.com/sinnercode228/aioamocrm/blob/main
 
 [![CI](https://github.com/sinnercode228/aioamocrm/actions/workflows/ci.yml/badge.svg)](https://github.com/sinnercode228/aioamocrm/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/aioamocrm.svg)](https://pypi.org/project/aioamocrm/)
+[![Python versions](https://img.shields.io/pypi/pyversions/aioamocrm.svg)](https://pypi.org/project/aioamocrm/)
 
 Async Python client for the amoCRM API v4, and for Kommo, which serves the same API on
 `kommo.com`. It covers the parts every integration ends up writing by hand: OAuth2 tokens that
@@ -1176,6 +1177,9 @@ The README samples are tests: every Python block after a `<!-- sample: name -->`
 `tests/test_readme.py` against respx mocks, and README.md and README.ru.md must carry the same
 samples. Bugs and questions go to
 [GitHub issues](https://github.com/sinnercode228/aioamocrm/issues).
+
+[CONTRIBUTING.md](https://github.com/sinnercode228/aioamocrm/blob/main/CONTRIBUTING.md) has the rest: the
+lowest supported versions, the test fixtures, the changelog and the commit style.
 
 ## License
 

@@ -1,0 +1,53 @@
+name: Feature request
+description: An endpoint, a model or a behaviour aioamocrm could support.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        What is planned is listed under
+        [Limits and roadmap](https://github.com/sinnercode228/aioamocrm/blob/main/README.md#limits-and-roadmap)
+        in the README. A vote for an item there, with your use case, is welcome too.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What your integration needs
+      description: What you need to do in amoCRM or Kommo and cannot do now, or only by hand.
+    validations:
+      required: true
+  - type: textarea
+    id: api
+    attributes:
+      label: amoCRM API
+      description: The endpoints involved, with links to the amoCRM documentation or the official PHP SDK.
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you propose
+      description: How you would like to call it. Code is welcome.
+      render: python
+    validations:
+      required: true
+  - type: textarea
+    id: workaround
+    attributes:
+      label: What you do now
+      description: For example through `amo.request()`, or with another library.
+  - type: dropdown
+    id: roadmap
+    attributes:
+      label: Is it on the roadmap in the README?
+      options:
+        - "Yes"
+        - "No"
+        - Not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: contribute
+    attributes:
+      label: Would you send a pull request?
+      options:
+        - "Yes"
+        - Maybe, with some help
+        - "No"

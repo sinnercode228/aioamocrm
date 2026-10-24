@@ -4,6 +4,7 @@
 
 [![CI](https://github.com/sinnercode228/aioamocrm/actions/workflows/ci.yml/badge.svg)](https://github.com/sinnercode228/aioamocrm/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/aioamocrm.svg)](https://pypi.org/project/aioamocrm/)
+[![Python versions](https://img.shields.io/pypi/pyversions/aioamocrm.svg)](https://pypi.org/project/aioamocrm/)
 
 Асинхронный клиент amoCRM API v4 для Python. Работает и с Kommo: там тот же API, только на
 `kommo.com`. Библиотека берёт на себя то, что каждая интеграция с amoCRM рано или поздно пишет
@@ -1192,6 +1193,10 @@ pytest --cov
 в `tests/test_readme.py` против моков respx, и в README.md и README.ru.md должны быть одни и те
 же примеры. Об ошибках и с вопросами — в
 [issues на GitHub](https://github.com/sinnercode228/aioamocrm/issues).
+
+Остальное (самые старые поддерживаемые версии, тестовые фикстуры, CHANGELOG, стиль коммитов)
+описано в [CONTRIBUTING.md](https://github.com/sinnercode228/aioamocrm/blob/main/CONTRIBUTING.md),
+по-английски, с коротким разделом на русском в конце.
 
 ## Лицензия
 
