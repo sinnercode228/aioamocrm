@@ -12,9 +12,11 @@ from __future__ import annotations
 
 import email.utils
 import math
+import re
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import timezone
 from typing import Any
 
 import httpx
@@ -36,6 +38,11 @@ __all__ = [
 ]
 
 _MAX_TEXT = 300
+_ASCTIME_DATE = re.compile(
+    r"(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) "
+    r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) "
+    r"(?:[0-9]{2}| [0-9]) [0-9]{2}:[0-9]{2}:[0-9]{2} [0-9]{4}"
+)
 
 
 class AmoCRMError(Exception):
@@ -186,7 +193,11 @@ def parse_retry_after(value: str | None, *, now: float | None = None) -> float |
     except (TypeError, ValueError, IndexError):
         return None
     if moment.tzinfo is None:
-        return None
+        # RFC 9110 section 5.6.7 gives asctime dates an implicit UTC zone.
+        # Other zone-less email dates (including -0000) remain unreadable.
+        if not _ASCTIME_DATE.fullmatch(text):
+            return None
+        moment = moment.replace(tzinfo=timezone.utc)
     current = time.time() if now is None else now
     return max(0.0, moment.timestamp() - current)
 

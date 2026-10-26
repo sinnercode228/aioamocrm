@@ -228,3 +228,19 @@ async def test_a_single_attempt_policy_never_retries(
             await amo.request("GET", "account")
     assert route.call_count == 1
     assert sleeps == []
+
+
+async def test_429_with_asctime_retry_after_waits_that_long(
+    amo: AmoCRMClient, mock: respx.MockRouter, sleeps: list[float], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Seven seconds before Sun Nov 6 08:49:37 1994 UTC; no wall-clock dependence.
+    monkeypatch.setattr("aioamocrm._errors.time.time", lambda: 784111770.0)
+    route = mock.get("/api/v4/account").mock(
+        side_effect=[
+            httpx.Response(429, json=TOO_MANY, headers={"Retry-After": "Sun Nov  6 08:49:37 1994"}),
+            OK,
+        ]
+    )
+    assert await amo.request("GET", "account") == {"id": 1}
+    assert route.call_count == 2
+    assert sleeps == [7.0]
