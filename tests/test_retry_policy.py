@@ -89,3 +89,33 @@ def test_retry_after_http_date() -> None:
     later = datetime(2026, 10, 16, 12, 0, 7, tzinfo=timezone.utc)
     assert parse_retry_after(format_datetime(later, usegmt=True), now=now.timestamp()) == 7.0
     assert parse_retry_after(format_datetime(now, usegmt=True), now=later.timestamp()) == 0.0
+
+
+@pytest.mark.parametrize(
+    ("header", "day"),
+    [
+        ("Sun Nov  6 08:49:37 1994", 6),
+        ("Sun Nov 06 08:49:37 1994", 6),
+        ("Wed Nov 16 08:49:37 1994", 16),
+        ("Sunday, 06-Nov-94 08:49:37 GMT", 6),
+        ("Sun, 06 Nov 1994 08:49:37 GMT", 6),
+    ],
+)
+def test_retry_after_all_http_date_formats(header: str, day: int) -> None:
+    moment = datetime(1994, 11, day, 8, 49, 37, tzinfo=timezone.utc).timestamp()
+    assert parse_retry_after(header, now=moment - 7) == 7.0
+    assert parse_retry_after(header, now=moment + 7) == 0.0
+
+
+@pytest.mark.parametrize(
+    "header",
+    [
+        "Sun Nov  6 25:00:00 1994",
+        "Sun Nov  6 08:49:37",
+        "Sun Nov 6 08:49:37 1994",  # missing date3 padding
+        "Sun Nov  6 08:49:37 94",
+        "Sun Xxx  6 08:49:37 1994",
+    ],
+)
+def test_retry_after_malformed_asctime_is_ignored(header: str) -> None:
+    assert parse_retry_after(header, now=0) is None
