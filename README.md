@@ -732,7 +732,8 @@ print([lead.name for lead in found])
 | 401 with `LongLivedToken`, any other 4xx, any 3xx | raised | raised | raised |
 
 The wait before the next attempt is the `Retry-After` header when the answer has one (seconds or
-an HTTP date). Otherwise it is exponential backoff with jitter: attempt *n* waits a random time
+an HTTP date, including the obsolete RFC 850 and asctime formats; asctime is read as UTC).
+Otherwise it is exponential backoff with jitter: attempt *n* waits a random time
 between half and all of `min(backoff_max, backoff_base * 2 ** (n - 1))`, so 0.25 to 0.5 s, then
 0.5 to 1 s, then 1 to 2 s with the defaults. `max_attempts` counts every try, the first one
 included (4 by default). A `Retry-After` longer than `max_retry_after` (60 s) is not waited out:
@@ -1058,8 +1059,6 @@ Limits of the 0.1 releases:
   alone.
 - After `AccountMovedError` the client stays on the old host: you create a new one for the
   account's new domain.
-- A `Retry-After` in the obsolete asctime date format is ignored, and the client backs off
-  instead. Seconds, RFC 1123 and RFC 850 dates work.
 - Webhook payloads are strings in nested dicts, without models per entity.
 
 Next, in this order:

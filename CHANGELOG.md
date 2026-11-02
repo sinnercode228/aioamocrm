@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - Unreleased
+
+### Fixed
+
+- Honor `Retry-After` dates in the obsolete asctime format as UTC, including space-padded
+  and two-digit days. Other dates without a time zone are still ignored.
+
 ## [0.1.1] - 2026-10-17
 
 ### Fixed
