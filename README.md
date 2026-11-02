@@ -14,7 +14,10 @@ amoCRM posts to your server. Python 3.10 or newer, built on httpx and pydantic 2
 clean, ships `py.typed`.
 
 It grew out of the amoCRM connector in [Relay](https://github.com/sinnercode228/integration-hub),
-which creates leads with their contacts and notes and receives account webhooks.
+which creates leads with their contacts and notes and receives account webhooks. Relay's amoCRM
+recipes are in [`examples/`](https://github.com/sinnercode228/aioamocrm/tree/main/examples): a
+Tilda form that becomes a lead with a new or an existing contact and a note, and skipping resent
+webhooks.
 
 Its default tests run against mocked HTTP. Live tests against a real amoCRM account, in
 [`tests/live`](https://github.com/sinnercode228/aioamocrm/tree/main/tests/live), run only when an account
