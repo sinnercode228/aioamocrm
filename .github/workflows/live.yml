@@ -1,0 +1,49 @@
+name: Live
+
+# Runs tests/live against a real amoCRM account, by hand and once a week. It needs the
+# repository secrets AMOCRM_SUBDOMAIN and AMOCRM_LONG_LIVED_TOKEN, plus AMOCRM_DOMAIN when the
+# account is not on amocrm.ru (kommo.com, amocrm.com). Without them the job writes a notice and
+# stops without running anything. Use a test account: the lead test leaves a closed lead tagged
+# aioamocrm-live behind, because the API cannot delete leads.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 4 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live
+  cancel-in-progress: false
+
+jobs:
+  live:
+    name: Live amoCRM account
+    runs-on: ubuntu-latest
+    env:
+      AMOCRM_SUBDOMAIN: ${{ secrets.AMOCRM_SUBDOMAIN }}
+      AMOCRM_LONG_LIVED_TOKEN: ${{ secrets.AMOCRM_LONG_LIVED_TOKEN }}
+      AMOCRM_DOMAIN: ${{ secrets.AMOCRM_DOMAIN }}
+    steps:
+      - name: Check the secrets
+        id: secrets
+        run: |
+          if [ -n "$AMOCRM_SUBDOMAIN" ] && [ -n "$AMOCRM_LONG_LIVED_TOKEN" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::AMOCRM_SUBDOMAIN or AMOCRM_LONG_LIVED_TOKEN is not set, so the live tests were skipped."
+          fi
+      - uses: actions/checkout@v4
+        if: steps.secrets.outputs.configured == 'true'
+      - uses: actions/setup-python@v5
+        if: steps.secrets.outputs.configured == 'true'
+        with:
+          python-version: "3.13"
+          cache: pip
+      - if: steps.secrets.outputs.configured == 'true'
+        run: python -m pip install -e ".[dev]"
+      - if: steps.secrets.outputs.configured == 'true'
+        run: python -m pytest -m live tests/live

@@ -16,9 +16,11 @@ clean, ships `py.typed`.
 It grew out of the amoCRM connector in [Relay](https://github.com/sinnercode228/integration-hub),
 which creates leads with their contacts and notes and receives account webhooks.
 
-There is still no amoCRM account behind its tests: they run against mocked HTTP. I wrote the
-request and answer shapes from the amoCRM documentation and then cross-checked them against
-amoCRM's official PHP SDK. [What was checked and how](#what-was-checked-and-how) lists what the
+Its default tests run against mocked HTTP. Live tests against a real amoCRM account, in
+[`tests/live`](https://github.com/sinnercode228/aioamocrm/tree/main/tests/live), run only when an account
+and its long-lived token are configured; otherwise they are skipped. I wrote the request and
+answer shapes from the amoCRM documentation and then cross-checked them against amoCRM's
+official PHP SDK. [What was checked and how](#what-was-checked-and-how) lists what the
 SDK confirms, what it made me fix, and what still rests on the documentation alone.
 
 ## Why another client
@@ -832,8 +834,13 @@ headers.
 
 ## What was checked and how
 
-There is still no amoCRM account behind the tests: every request and every answer is mocked with
-respx. I first wrote the shapes from the
+The default test suite has no amoCRM account behind it: every request and every answer is mocked
+with respx. Live tests in
+[`tests/live`](https://github.com/sinnercode228/aioamocrm/tree/main/tests/live) read the account
+and its pipelines and take one tagged lead through create, read, update, a note and closing. They
+run when `AMOCRM_SUBDOMAIN` and `AMOCRM_LONG_LIVED_TOKEN` are set, locally or as repository
+secrets for the `Live` workflow (by hand and weekly), and are skipped otherwise. I first wrote
+the shapes from the
 [amoCRM API v4 documentation](https://www.amocrm.ru/developers/content/crm_platform/api-reference)
 as I knew it, because the documentation site was not reachable while I worked on this version.
 Then I cross-checked them against the official PHP SDK that amoCRM maintains,

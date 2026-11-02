@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [0.1.2] - Unreleased
 
+### Added
+
+- Live tests in `tests/live`, marked `live`, against a real account: the account, its
+  pipelines, and one tagged lead taken through create, read, update, a note and closing. They
+  are skipped unless `AMOCRM_SUBDOMAIN` and `AMOCRM_LONG_LIVED_TOKEN` are set; the `Live`
+  workflow runs them by hand and weekly when the repository has those secrets.
+
 ### Fixed
 
 - Honor `Retry-After` dates in the obsolete asctime format as UTC, including space-padded

@@ -62,6 +62,9 @@ testpaths = ["tests"]
 addopts = "-ra --strict-markers --strict-config"
 xfail_strict = true
 filterwarnings = ["error"]
+markers = [
+  "live: talks to a real amoCRM account; skipped unless AMOCRM_SUBDOMAIN and AMOCRM_LONG_LIVED_TOKEN are set",
+]
 
 [tool.coverage.run]
 source = ["aioamocrm"]

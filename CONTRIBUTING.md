@@ -31,8 +31,19 @@ pytest
 pytest --cov     # the same, with branch coverage and the lines it missed
 ```
 
-No test talks to amoCRM. The client's requests go through httpx to
+No test of the default run talks to amoCRM. The client's requests go through httpx to
 [respx](https://lundberg.github.io/respx/) mocks, so the suite needs no account and no token.
+
+The live tests in `tests/live`, marked `live`, are the exception: they are skipped unless
+`AMOCRM_SUBDOMAIN` and `AMOCRM_LONG_LIVED_TOKEN` are set (and `AMOCRM_DOMAIN` for an account
+outside `amocrm.ru`). They read the account and its pipelines and create one lead tagged
+`aioamocrm-live`, which they update, give a note and move to "lost" at the end; the API cannot
+delete leads, so use a test account. The `Live` workflow runs them by hand and weekly with
+repository secrets of the same names, and skips them when the secrets are missing.
+
+```sh
+AMOCRM_SUBDOMAIN=example AMOCRM_LONG_LIVED_TOKEN=... pytest -m live tests/live
+```
 
 CI also runs the suite on Python 3.10 with the lowest supported versions. FastAPI needs a newer
 pydantic than 2.5.0, so it is removed there, and the tests that need it are skipped. To do the
