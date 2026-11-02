@@ -12,7 +12,7 @@ All notable changes to this project are documented here. The format follows
   pipelines, and one tagged lead taken through create, read, update, a note and closing. They
   are skipped unless `AMOCRM_SUBDOMAIN` and `AMOCRM_LONG_LIVED_TOKEN` are set; the `Live`
   workflow runs them by hand and weekly when the repository has those secrets.
-- Two examples ported from Relay: `examples/tilda_lead.py` turns a Tilda form submission into a
+- Two examples based on Relay's amoCRM connector: `examples/tilda_lead.py` turns a Tilda form submission into a
   lead with a new or an existing contact (found by phone or email) and a note, and
   `examples/webhook_dedupe.py` gives each webhook event a key that a resent webhook repeats, so
   it is handled once.
